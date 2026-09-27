@@ -27,23 +27,14 @@ export function footer(ctx: RenderContext): string {
   </footer>`;
 }
 
-// Tiled diagonally over the full canvas (including photos and footer) so it can't simply be cropped off.
-const WATERMARK_TEXT = 'পোস্টার মেকার • FREE';
+// Free-plan mark: a single badge in the bottom-right corner.
 export function watermarkLayer(ctx: RenderContext): string {
   if (!ctx.watermark) return '';
-  const row = Array.from({ length: 4 }, () => `<span>${WATERMARK_TEXT}</span>`).join('');
-  const rows = Array.from({ length: 14 }, (_, i) => `<div class="wm-row"${i % 2 ? ' style="margin-left:-260px"' : ''}>${row}</div>`).join('');
-  return `<div class="wm" aria-hidden="true"><div class="wm-grid">${rows}</div></div>
-  <div class="wm-badge">পোস্টার মেকার দিয়ে তৈরি · Free plan</div>`;
+  return `<div class="wm-badge">by Poster Maker</div>`;
 }
 
 const WATERMARK_CSS = `
-.wm{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:50}
-.wm-grid{position:absolute;left:-600px;top:-500px;width:2400px;transform:rotate(-30deg);display:flex;flex-direction:column;gap:120px}
-.wm-row{display:flex;gap:140px;white-space:nowrap}
-.wm-row span{font-family:'Hind Siliguri',sans-serif;font-weight:700;font-size:54px;color:rgba(255,255,255,.22);
-  -webkit-text-stroke:1.5px rgba(0,0,0,.18);letter-spacing:2px}
-.wm-badge{position:absolute;right:24px;bottom:24px;z-index:51;padding:8px 18px;border-radius:999px;
+.wm-badge{position:absolute;right:24px;bottom:24px;z-index:50;padding:8px 18px;border-radius:999px;
   background:rgba(0,0,0,.55);color:#fff;font-family:'Hind Siliguri',sans-serif;font-size:24px;font-weight:600}`;
 
 export const FIT_SCRIPT = `<script>

@@ -37,11 +37,9 @@ describe('renderPosterHtml', () => {
     expect(html).toContain('window.__fitDone');
   });
 
-  it('adds the tiled watermark only when asked', () => {
-    expect(renderPosterHtml(baseCtx())).not.toContain('class="wm"');
-    const html = renderPosterHtml(baseCtx({ watermark: true }));
-    expect(html).toContain('class="wm"');
-    expect(html).toContain('wm-badge');
+  it('adds the bottom-right watermark badge only when asked', () => {
+    expect(renderPosterHtml(baseCtx())).not.toContain('wm-badge');
+    expect(renderPosterHtml(baseCtx({ watermark: true }))).toContain('<div class="wm-badge">by Poster Maker</div>');
   });
 
   it('renders exactly one <img> per photo slot used', () => {
