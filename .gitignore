@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+*.log
+.superpowers/
+.data/
+
+# docs stay local
+*.md
