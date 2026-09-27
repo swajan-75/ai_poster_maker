@@ -6,6 +6,9 @@ import { makeTestDeps, registerAgent } from './helpers.js';
 import { seedTemplates, SEED_TEMPLATES } from '../scripts/seed-data.js';
 import { TemplateModel } from '../src/models/template.model.js';
 import { UserModel } from '../src/models/user.model.js';
+import { PosterUsageModel } from '../src/models/poster-usage.model.js';
+import { PaymentModel } from '../src/models/payment.model.js';
+import { PosterModel } from '../src/models/poster.model.js';
 
 useTestDb();
 const app = createApp(makeTestDeps());
@@ -114,5 +117,51 @@ describe('admin: user block/flag', () => {
   it('an admin cannot block their own account', async () => {
     const admin = await makeAdmin();
     await admin.agent.patch(`/api/admin/users/${admin.user.id}/block`).expect(403);
+  });
+});
+
+describe('admin: analytics', () => {
+  it('non-admin → 403', async () => {
+    const u = await registerAgent(app);
+    await u.agent.get('/api/admin/analytics').expect(403);
+  });
+
+  it('aggregates users, posters (incl. deleted), revenue and top templates', async () => {
+    const admin = await makeAdmin();
+    // Created directly: another /register call would trip the auth rate limiter in this file.
+    const created = await UserModel.create({ name: 'ক', email: 'stats@test.com', passwordHash: 'x' });
+    const u = { user: { id: created.id as string } };
+    await seedTemplates();
+    const victory = (await TemplateModel.findOne({ slug: 'victory-day-classic' }))!;
+    const royal = (await TemplateModel.findOne({ slug: 'victory-day-royal' }))!;
+    await UserModel.updateOne({ _id: u.user.id }, { plan: 'pro', planExpiresAt: new Date(Date.now() + 86_400_000) });
+    // 3 posters on victory (2 of them since deleted), 1 on royal
+    await PosterUsageModel.insertMany([
+      ...Array.from({ length: 3 }, () => ({ userId: u.user.id, templateId: victory._id, plan: 'free' })),
+      { userId: u.user.id, templateId: royal._id, plan: 'pro' },
+    ]);
+    await PosterModel.insertMany([
+      { userId: u.user.id, templateId: victory._id, formData: {}, photoIds: ['x'], status: 'completed' },
+      { userId: u.user.id, templateId: royal._id, formData: {}, photoIds: ['x'], status: 'failed' },
+    ]);
+    const expiresAt = new Date(Date.now() + 60_000);
+    await PaymentModel.insertMany([
+      { userId: u.user.id, plan: 'pro', amount: 199, status: 'completed', paidAt: new Date(), expiresAt, trxId: 'A1' },
+      { userId: u.user.id, plan: 'ultra', amount: 349, status: 'completed', paidAt: new Date(), expiresAt, trxId: 'A2' },
+      { userId: u.user.id, plan: 'pro', amount: 199, status: 'cancelled', expiresAt },
+    ]);
+
+    const { body } = await admin.agent.get('/api/admin/analytics').expect(200);
+    expect(body.users).toMatchObject({ total: 2, newLast7d: 2, blocked: 0, byPlan: { free: 1, pro: 1, ultra: 0 } });
+    expect(body.posters).toMatchObject({ createdTotal: 4, createdLast24h: 4, createdLast7d: 4, failureRate: 0.5 });
+    expect(body.posters.byStatus).toEqual({ queued: 0, generating: 0, completed: 1, failed: 1 });
+    expect(body.revenue).toMatchObject({ totalBdt: 548, last30dBdt: 548, paidCount: 2 });
+    expect(body.revenue.paymentsByStatus).toMatchObject({ completed: 2, cancelled: 1, pending: 0 });
+    expect(body.revenue.paidByPlan).toEqual({ pro: { count: 1, amountBdt: 199 }, ultra: { count: 1, amountBdt: 349 } });
+    expect(body.daily).toHaveLength(14);
+    expect(body.daily.at(-1)).toMatchObject({ posters: 4, newUsers: 2, revenueBdt: 548 });
+    expect(body.topTemplates[0]).toMatchObject({ templateId: victory.id, posters: 3, isFree: true });
+    expect(body.topTemplates[1]).toMatchObject({ templateId: royal.id, posters: 1, isFree: false });
+    expect(body.ai.design).toEqual({ calls: 0, successRate: null, avgLatencyMs: null });
   });
 });

@@ -4,6 +4,6 @@ import { useRouter } from 'next/navigation';
 
 export default function AdminIndexPage() {
   const router = useRouter();
-  useEffect(() => { router.replace('/admin/templates'); }, [router]);
+  useEffect(() => { router.replace('/admin/analytics'); }, [router]);
   return null;
 }

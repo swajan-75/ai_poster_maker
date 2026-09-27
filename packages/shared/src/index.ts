@@ -5,3 +5,4 @@ export * from './auth.js';
 export * from './template.js';
 export * from './poster.js';
 export * from './subscription.js';
+export * from './analytics.js';

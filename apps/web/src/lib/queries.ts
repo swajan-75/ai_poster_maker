@@ -1,7 +1,7 @@
 'use client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AdminPosterListDTO, AdminTemplateCreateInput, AdminTemplateDTO, AdminTemplateUpdateInput, AdminUserListDTO,
+  AdminAnalyticsDTO, AdminPosterListDTO, AdminTemplateCreateInput, AdminTemplateDTO, AdminTemplateUpdateInput, AdminUserListDTO,
   AuthResponse, BkashExecuteInput, CreatePosterInput, ExecutePaymentResponse, LoginInput, Occasion, PaidPlan, PaymentDTO,
   PosterDTO, PosterListDTO, PosterStatus, PublicUser, RegenerateInput, RegisterInput, SubscriptionDTO, TemplateDTO,
   UploadedPhotoDTO,
@@ -18,6 +18,7 @@ export const qk = {
   subscription: ['subscription'] as const,
   payment: (id: string) => ['payment', id] as const,
   adminTemplates: ['adminTemplates'] as const,
+  adminAnalytics: ['adminAnalytics'] as const,
   adminPosters: (page: number, status?: PosterStatus) => ['adminPosters', page, status ?? 'all'] as const,
   adminUsers: (page: number, blocked?: boolean) => ['adminUsers', page, blocked ?? 'all'] as const,
 };
@@ -174,6 +175,14 @@ export function useCancelPayment(id: string) {
 }
 
 // --- Admin ---
+
+export function useAdminAnalytics() {
+  return useQuery({
+    queryKey: qk.adminAnalytics,
+    queryFn: () => apiFetch<AdminAnalyticsDTO>('/admin/analytics'),
+    refetchInterval: 60_000,
+  });
+}
 
 export function useAdminTemplates() {
   return useQuery({

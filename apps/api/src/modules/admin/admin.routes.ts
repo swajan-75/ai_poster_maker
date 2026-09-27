@@ -9,6 +9,7 @@ import {
   createTemplate, deactivateTemplate, listAllPosters, listAllTemplates, listUsers,
   setUserBlocked, toAdminTemplateDTO, updateTemplate,
 } from './admin.service.js';
+import { getAnalytics } from './analytics.service.js';
 
 const pageQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -22,6 +23,12 @@ export function adminRouter(deps: AppDeps): Router {
   const { env, storage } = deps;
   const r = Router();
   r.use(requireAuth(env), requireRole('admin'));
+
+  // --- Usage analytics ---
+  r.get('/analytics', async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(await getAnalytics());
+  });
 
   // --- Templates ---
   r.get('/templates', async (_req, res) => {

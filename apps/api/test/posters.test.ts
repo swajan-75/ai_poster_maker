@@ -8,6 +8,7 @@ import { seedTemplates } from '../scripts/seed-data.js';
 import { TemplateModel } from '../src/models/template.model.js';
 import { PosterModel } from '../src/models/poster.model.js';
 import { UserModel } from '../src/models/user.model.js';
+import { PosterUsageModel } from '../src/models/poster-usage.model.js';
 import { MemoryStorage } from '../src/services/storage/memory-storage.js';
 
 useTestDb();
@@ -96,6 +97,34 @@ describe('POST /api/posters', () => {
     const res = await create(agent);
     expect(res.status).toBe(429);
     expect(res.body.error.code).toBe('DAILY_LIMIT');
+  });
+
+  it('deleting posters does not give back daily slots', async () => {
+    const { agent } = await registerAgent(app);
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) ids.push((await create(agent)).body.id);
+    for (const id of ids) await agent.delete(`/api/posters/${id}`).expect(204);
+    const res = await create(agent);
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('DAILY_LIMIT');
+    expect(new Date(res.body.error.details.resetsAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('slots free up 24h after each poster was created', async () => {
+    const { agent } = await registerAgent(app);
+    for (let i = 0; i < 3; i++) expect((await create(agent)).status).toBe(202);
+    // createdAt is immutable through Mongoose, so shift it at the driver level.
+    await PosterUsageModel.collection.updateMany({}, { $set: { createdAt: new Date(Date.now() - 24 * 3600_000 - 1000) } });
+    expect((await create(agent)).status).toBe(202);
+  });
+
+  it('parallel requests cannot exceed the limit', async () => {
+    const { agent } = await registerAgent(app);
+    const photoIds = await Promise.all(Array.from({ length: 5 }, () => upload(agent)));
+    const results = await Promise.all(photoIds.map((id) =>
+      agent.post('/api/posters').send({ templateId: victoryId, formData: sampleForm, photoIds: [id] })));
+    expect(results.filter((r) => r.status === 202).length).toBeLessThanOrEqual(3);
+    expect(await PosterModel.countDocuments()).toBeLessThanOrEqual(3);
   });
 
   it('requires auth', async () => {
@@ -245,7 +274,7 @@ describe('subscription plans', () => {
     const { agent, user } = await registerAgent(app);
     await setPlan(user.id, plan);
     const t = await TemplateModel.findById(victoryId);
-    await PosterModel.insertMany(Array.from({ length: limit - 1 }, () => ({ userId: user.id, templateId: t!._id, formData: sampleForm, photoIds: ['x'], status: 'completed' })));
+    await PosterUsageModel.insertMany(Array.from({ length: limit - 1 }, () => ({ userId: user.id, templateId: t!._id, plan })));
     expect((await create(agent)).status).toBe(202);
     const res = await create(agent);
     expect(res.status).toBe(429);

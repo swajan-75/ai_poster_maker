@@ -22,7 +22,7 @@ describe('billing', () => {
     const { agent, user } = await registerAgent(app);
     expect(user).toMatchObject({ plan: 'free', planExpiresAt: null });
     const sub = await agent.get('/api/billing/subscription').expect(200);
-    expect(sub.body).toEqual({ plan: 'free', expiresAt: null, dailyLimit: 3, usedToday: 0, watermark: true });
+    expect(sub.body).toEqual({ plan: 'free', expiresAt: null, dailyLimit: 3, usedToday: 0, resetsAt: null, watermark: true });
   });
 
   it('checkout → pending bKash payment with the plan price', async () => {

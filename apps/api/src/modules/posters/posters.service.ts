@@ -11,7 +11,8 @@ import type { StorageService } from '../../services/storage/storage.js';
 import { isOwnedUpload } from '../../services/storage/paths.js';
 import { getActiveTemplate } from '../templates/templates.service.js';
 import { TemplateModel } from '../../models/template.model.js';
-import { getUserPlan, postersToday } from '../billing/subscription.service.js';
+import { PosterUsageModel } from '../../models/poster-usage.model.js';
+import { getUserPlan, reservePosterSlot } from '../billing/subscription.service.js';
 
 export type AuthUser = { id: string; role: UserRole };
 
@@ -47,13 +48,17 @@ export async function createPoster(user: AuthUser, input: CreatePosterInput, dep
   const formData = normalizeForm(input.formData);
   assertClean(formData);
 
-  const { dailyPosters, watermark } = PLAN_FEATURES[plan];
-  if ((await postersToday(user.id)) >= dailyPosters)
-    throw new AppError(429, 'DAILY_LIMIT', 'Daily poster limit reached', { plan, limit: dailyPosters });
-
-  const poster = await PosterModel.create({
-    userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, watermarked: watermark,
-  });
+  const usageId = await reservePosterSlot(user.id, template.id, plan);
+  let poster: PosterDoc;
+  try {
+    poster = await PosterModel.create({
+      userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, watermarked: PLAN_FEATURES[plan].watermark,
+    });
+  } catch (err) {
+    await PosterUsageModel.deleteOne({ _id: usageId });
+    throw err;
+  }
+  await PosterUsageModel.updateOne({ _id: usageId }, { posterId: poster._id });
   deps.queue.enqueue(poster.id);
   return poster;
 }

@@ -30,7 +30,7 @@ describe('apiFetch', () => {
 
 describe('errorMessage', () => {
   it('maps codes to Bangla and falls back', () => {
-    expect(errorMessage(new ApiError(429, 'DAILY_LIMIT', 'x'))).toMatch(/আজকের/);
+    expect(errorMessage(new ApiError(429, 'DAILY_LIMIT', 'x'))).toMatch(/২৪ ঘণ্টার/);
     expect(errorMessage(new Error('boom'))).toMatch(/কিছু একটা ভুল/);
   });
 });

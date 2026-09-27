@@ -29,6 +29,8 @@ export interface SubscriptionDTO {
   expiresAt: string | null;
   dailyLimit: number;
   usedToday: number;
+  /** When the next daily slot frees up (rolling 24h window); null if nothing used in the window. */
+  resetsAt: string | null;
   watermark: boolean;
 }
 

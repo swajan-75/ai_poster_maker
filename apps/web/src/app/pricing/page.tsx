@@ -47,6 +47,7 @@ function PricingContent() {
           <p className="text-sm text-ink/55">
             {t.pricingPage.usedToday(sub.data.usedToday, sub.data.dailyLimit)}
             {sub.data.expiresAt && <> · {t.pricingPage.activeUntil(formatDate(new Date(sub.data.expiresAt), locale))}</>}
+            {sub.data.usedToday >= sub.data.dailyLimit && sub.data.resetsAt && <> · {t.pricingPage.nextSlot(formatDate(new Date(sub.data.resetsAt), locale))}</>}
           </p>
         )}
       </div>

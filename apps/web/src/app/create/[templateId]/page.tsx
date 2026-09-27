@@ -7,7 +7,7 @@ import { useCreatePoster, useMe, useTemplate } from '@/lib/queries';
 import { UpgradePrompt } from '@/components/UpgradePrompt';
 import { PosterForm, type PosterPreview } from '@/components/PosterForm';
 import { errorMessage } from '@/lib/error-messages';
-import { useT } from '@/lib/i18n';
+import { formatDate, useLocale, useT } from '@/lib/i18n';
 import { useTilt } from '@/lib/use-tilt';
 
 // A rough, instant sketch of the poster so typing feels alive; the real design comes from the AI.
@@ -46,6 +46,7 @@ function LivePreview({ template, preview }: { template: TemplateDTO; preview?: P
 
 export default function CreatePosterPage() {
   const tr = useT();
+  const [locale] = useLocale();
   const { templateId } = useParams<{ templateId: string }>();
   const router = useRouter();
   const template = useTemplate(templateId);
@@ -65,9 +66,13 @@ export default function CreatePosterPage() {
   const t = template.data;
   const locked = !t.isFree && me?.plan === 'free';
   const errCode = create.error?.code;
+  function limitBody() {
+    const at = (create.error?.details as { resetsAt?: string | null } | undefined)?.resetsAt;
+    return at ? tr.upgrade.limitBodyAt(formatDate(new Date(at), locale)) : tr.upgrade.limitBody;
+  }
   // Hitting a plan limit is an upsell moment, not just an error line (Ultra has nowhere to go).
   const upsell = errCode === 'UPGRADE_REQUIRED' ? { title: tr.upgrade.premiumTitle, body: tr.upgrade.premiumBody }
-    : errCode === 'DAILY_LIMIT' && me?.plan !== 'ultra' ? { title: tr.upgrade.limitTitle, body: tr.upgrade.limitBody }
+    : errCode === 'DAILY_LIMIT' && me?.plan !== 'ultra' ? { title: tr.upgrade.limitTitle, body: limitBody() }
     : null;
   return (
     <section className="flex flex-col gap-6">

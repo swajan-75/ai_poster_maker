@@ -27,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <section className="flex flex-col gap-6">
       <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{t.admin.pageTitle}</h1>
       <nav className="flex flex-wrap gap-2">
+        <Tab href="/admin/analytics">{t.admin.analyticsTab}</Tab>
         <Tab href="/admin/templates">{t.admin.templatesTab}</Tab>
         <Tab href="/admin/posters">{t.admin.postersTab}</Tab>
         <Tab href="/admin/users">{t.admin.usersTab}</Tab>
