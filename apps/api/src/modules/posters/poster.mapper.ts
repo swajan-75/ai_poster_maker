@@ -8,6 +8,7 @@ export function toPosterDTO(p: PosterDoc, storage: StorageService): PosterDTO {
   return {
     id: p.id,
     templateId: p.templateId.toString(),
+    size: p.size,
     formData: p.formData as PosterFormData,
     status: p.status,
     imageUrl: done ? storage.getUrl(p.imagePublicId!, { format: 'jpg', width: 900, version }) : null,

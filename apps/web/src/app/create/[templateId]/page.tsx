@@ -2,16 +2,17 @@
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { PosterFormData, TemplateDTO } from '@poster/shared';
+import { DEFAULT_POSTER_SIZE, SIZE_SPECS, type PosterFormData, type PosterSize, type TemplateDTO } from '@poster/shared';
 import { useCreatePoster, useMe, useTemplate } from '@/lib/queries';
 import { UpgradePrompt } from '@/components/UpgradePrompt';
+import { SizePicker } from '@/components/SizePicker';
 import { PosterForm, type PosterPreview } from '@/components/PosterForm';
 import { errorMessage } from '@/lib/error-messages';
 import { formatDate, useLocale, useT } from '@/lib/i18n';
 import { useTilt } from '@/lib/use-tilt';
 
 // A rough, instant sketch of the poster so typing feels alive; the real design comes from the AI.
-function LivePreview({ template, preview }: { template: TemplateDTO; preview?: PosterPreview }) {
+function LivePreview({ template, preview, size }: { template: TemplateDTO; preview?: PosterPreview; size: PosterSize }) {
   const tr = useT();
   const tilt = useTilt<HTMLDivElement>(6);
   const p = preview;
@@ -22,7 +23,9 @@ function LivePreview({ template, preview }: { template: TemplateDTO; preview?: P
         <span className="rounded-full bg-white px-2.5 py-0.5 text-xs text-ink/55 ring-1 ring-line">{tr.occasion[template.occasion]}</span>
       </div>
       <div {...tilt} className="tilt card relative overflow-hidden" aria-hidden="true">
-        <img src={template.thumbnailUrl} alt="" className="aspect-[3/4] w-full object-cover" />
+        {/* The thumbnail is portrait; cropping it to the chosen shape gives a feel for the size. */}
+        <img src={template.thumbnailUrl} alt="" className="w-full object-cover transition-[aspect-ratio] duration-300"
+          style={{ aspectRatio: `${SIZE_SPECS[size].width} / ${SIZE_SPECS[size].height}` }} />
         {p?.photoUrl && (
           <img key={p.photoUrl} src={p.photoUrl} alt="" className="pop absolute left-1/2 top-[14%] h-[34%] w-auto -translate-x-1/2 rounded-2xl object-cover shadow-2xl ring-4 ring-white" />
         )}
@@ -53,12 +56,13 @@ export default function CreatePosterPage() {
   const create = useCreatePoster();
   const { data: me } = useMe({ optional: true });
   const [preview, setPreview] = useState<PosterPreview>();
+  const [size, setSize] = useState<PosterSize>(DEFAULT_POSTER_SIZE);
   const templateIdOf = template.data?.id;
   const { mutate } = create;
   // Stable callback so the memoized form doesn't re-render on every preview keystroke.
   const onSubmit = useCallback(({ formData, photoIds }: { formData: PosterFormData; photoIds: string[] }) => {
-    if (templateIdOf) mutate({ templateId: templateIdOf, formData, photoIds }, { onSuccess: (p) => router.push(`/posters/${p.id}`) });
-  }, [templateIdOf, mutate, router]);
+    if (templateIdOf) mutate({ templateId: templateIdOf, formData, photoIds, size }, { onSuccess: (p) => router.push(`/posters/${p.id}`) });
+  }, [templateIdOf, mutate, router, size]);
 
   if (template.isLoading) return <div className="grid gap-8 md:grid-cols-[1fr_340px]"><div className="skeleton h-[32rem]" /><div className="skeleton hidden aspect-[3/4] md:block" /></div>;
   if (template.error || !template.data) return <p role="alert" className="card p-4 text-rally">{errorMessage(template.error)}</p>;
@@ -85,11 +89,12 @@ export default function CreatePosterPage() {
       </div>
       <div className="grid items-start gap-8 md:grid-cols-[1fr_340px]">
         <div className="md:order-2 md:sticky md:top-24">
-          <div className="mx-auto max-w-[260px] md:max-w-none"><LivePreview template={t} preview={preview} /></div>
+          <div className="mx-auto max-w-[260px] md:max-w-none"><LivePreview template={t} preview={preview} size={size} /></div>
         </div>
         <div className="flex flex-col gap-4 md:order-1">
           {locked ? <UpgradePrompt title={tr.upgrade.premiumTitle} body={tr.upgrade.premiumBody} cta={tr.upgrade.cta} /> : <>
           {upsell && <UpgradePrompt compact title={upsell.title} body={upsell.body} cta={tr.upgrade.cta} />}
+          <SizePicker value={size} onChange={setSize} />
           <PosterForm
             template={t}
             submitting={create.isPending}

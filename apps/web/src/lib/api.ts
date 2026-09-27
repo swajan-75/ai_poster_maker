@@ -30,3 +30,28 @@ export async function apiFetch<T>(path: string, init: RequestInit & { json?: unk
   }
   return data as T;
 }
+
+/** Fetches an authenticated file (e.g. a PDF) and saves it; plain links can't send the Bearer token. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { headers, credentials: 'same-origin' });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Network error');
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as Partial<ApiErrorBody> | null;
+    throw new ApiError(res.status, data?.error?.code ?? 'INTERNAL', data?.error?.message ?? res.statusText);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

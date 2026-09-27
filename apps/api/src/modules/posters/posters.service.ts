@@ -1,13 +1,15 @@
 import { isValidObjectId } from 'mongoose';
+import sharp from 'sharp';
 import {
   MAX_REGENERATIONS, PLAN_FEATURES,
-  type CreatePosterInput, type Plan, type PosterFormData, type RegenerateInput, type UserRole,
+  SIZE_SPECS, type CreatePosterInput, type PdfPaper, type Plan, type PosterFormData, type RegenerateInput, type UserRole,
 } from '@poster/shared';
 import { AppError, badRequest, conflict, notFound, tooMany, unprocessable } from '../../lib/errors.js';
 import { findBlockedTerm } from '../../lib/moderation.js';
 import { PosterModel, type PosterDoc } from '../../models/poster.model.js';
 import type { PosterQueue } from '../../jobs/job-queue.js';
 import type { StorageService } from '../../services/storage/storage.js';
+import type { PosterRenderer } from '../../render/renderer.js';
 import { isOwnedUpload } from '../../services/storage/paths.js';
 import { getActiveTemplate } from '../templates/templates.service.js';
 import { TemplateModel } from '../../models/template.model.js';
@@ -52,7 +54,7 @@ export async function createPoster(user: AuthUser, input: CreatePosterInput, dep
   let poster: PosterDoc;
   try {
     poster = await PosterModel.create({
-      userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, watermarked: PLAN_FEATURES[plan].watermark,
+      userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, size: input.size, watermarked: PLAN_FEATURES[plan].watermark,
     });
   } catch (err) {
     await PosterUsageModel.deleteOne({ _id: usageId });
@@ -136,4 +138,28 @@ export async function removeWatermark(id: string, user: AuthUser, deps: { queue:
   }
   deps.queue.enqueue(updated.id);
   return updated;
+}
+
+const PDF_MARGIN_MM = 8;
+
+/**
+ * Print-ready PDF: the finished image centred on an A4/A3 page (landscape page for landscape posters),
+ * scaled to fill the printable area. The watermark, if any, is part of the image.
+ */
+export async function getPosterPdf(
+  id: string, user: AuthUser, paper: PdfPaper, deps: { storage: StorageService; renderer: PosterRenderer },
+): Promise<{ pdf: Buffer; filename: string }> {
+  const p = await getPosterForUser(id, user);
+  if (p.status !== 'completed' || !p.imagePublicId) throw conflict('POSTER_NOT_READY', 'Poster is not ready yet');
+  const image = await sharp(await deps.storage.fetchImage(p.imagePublicId)).jpeg({ quality: 95 }).toBuffer();
+  const landscape = SIZE_SPECS[p.size].orientation === 'landscape';
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+@page{margin:0}
+*{margin:0;padding:0}
+html,body{width:100%;height:100%}
+body{display:flex;align-items:center;justify-content:center}
+img{max-width:calc(100vw - ${PDF_MARGIN_MM * 2}mm);max-height:calc(100vh - ${PDF_MARGIN_MM * 2}mm);object-fit:contain}
+</style></head><body><img src="data:image/jpeg;base64,${image.toString('base64')}" alt=""><script>window.__fitDone = true</script></body></html>`;
+  const pdf = await deps.renderer.renderPdf(html, { paper, landscape });
+  return { pdf, filename: `poster-${p.id}-${paper}.pdf` };
 }

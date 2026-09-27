@@ -29,6 +29,19 @@ function deps(over: Partial<GenerateDeps> = {}): GenerateDeps & { storage: Memor
 }
 
 describe('generatePoster', () => {
+  it('renders at the poster size and asks for a background of that aspect ratio', async () => {
+    const provider = new FakeBackgroundProvider();
+    const storage = new MemoryStorage();
+    const d = deps({ storage, backgrounds: createBackgroundService({ provider, storage, logger }) });
+    const { poster } = await seedPosterFixture(d.storage);
+    await PosterModel.updateOne({ _id: poster.id }, { size: 'landscape' });
+    await generatePoster(poster.id, d);
+    expect((await PosterModel.findById(poster.id))!.status).toBe('completed');
+    expect(d.renderer.sizes).toEqual(['landscape']);
+    expect(provider.aspects).toEqual(['16:9']);
+    expect(d.renderer.calls[0]).toContain('width:1600px;height:900px');
+  });
+
   it('renders the watermark for watermarked posters only', async () => {
     const d = deps();
     const { poster } = await seedPosterFixture(d.storage);

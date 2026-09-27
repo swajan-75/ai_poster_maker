@@ -12,7 +12,8 @@ export function PosterCard({ poster: p, onDelete, deleting }: { poster: PosterDT
       <Link href={`/posters/${p.id}`} className="block">
         <div className="relative overflow-hidden">
           {p.imageUrl
-            ? <img src={p.imageUrl} alt="" className="aspect-[3/4] w-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" loading="lazy" decoding="async" />
+            // Grid cells stay 3:4; other sizes are shown whole (contain) rather than cropped.
+            ? <img src={p.imageUrl} alt="" className={`aspect-[3/4] w-full transition-transform duration-700 group-hover:scale-[1.05] ${p.size === 'portrait' ? 'object-cover' : 'bg-ink/5 object-contain'}`} loading="lazy" decoding="async" />
             : <div className={`flex aspect-[3/4] items-center justify-center ${p.status === 'failed' ? 'bg-rally/5' : 'skeleton rounded-none'}`}><StatusBadge status={p.status} /></div>}
           {p.imageUrl && <span className="absolute left-2.5 top-2.5"><StatusBadge status={p.status} /></span>}
         </div>

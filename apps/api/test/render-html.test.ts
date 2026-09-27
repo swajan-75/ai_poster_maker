@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LAYOUT_KEYS, POSTER_SIZES, SIZE_SPECS } from '@poster/shared';
 import { renderPosterHtml, type RenderContext } from '../src/render/render-html.js';
 import { escapeHtml } from '../src/render/escape.js';
 import { getFontFaceCss } from '../src/render/fonts.js';
@@ -40,6 +41,13 @@ describe('renderPosterHtml', () => {
   it('adds the bottom-right watermark badge only when asked', () => {
     expect(renderPosterHtml(baseCtx())).not.toContain('wm-badge');
     expect(renderPosterHtml(baseCtx({ watermark: true }))).toContain('<div class="wm-badge">by Poster Maker</div>');
+  });
+
+  it.each(LAYOUT_KEYS.flatMap((l) => POSTER_SIZES.map((s) => [l, s] as const)))('%s layout at %s size: right canvas, all text', (layoutKey, size) => {
+    const html = renderPosterHtml(baseCtx({ layoutKey, size }));
+    const { width, height } = SIZE_SPECS[size];
+    expect(html).toContain(`html,body{width:${width}px;height:${height}px;`);
+    for (const s of ['মহান বিজয় দিবস', 'মোঃ আব্দুল করিম', 'সভাপতি']) expect(html).toContain(s);
   });
 
   it('renders exactly one <img> per photo slot used', () => {

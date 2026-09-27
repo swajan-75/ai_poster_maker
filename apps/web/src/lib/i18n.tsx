@@ -132,6 +132,12 @@ const dict = {
       payments: 'পেমেন্ট', paymentStatus: { pending: 'অপেক্ষমাণ', completed: 'সফল', failed: 'ব্যর্থ', cancelled: 'বাতিল' },
       ai: 'AI কল (৩০ দিন)', aiDesign: 'ডিজাইন', aiBackground: 'ব্যাকগ্রাউন্ড', calls: 'কল', success: 'সফল', latency: 'গড় সময়',
     },
+    sizes: {
+      label: 'পোস্টারের সাইজ', hint: 'AI বেছে নেওয়া সাইজ অনুযায়ী ডিজাইন সাজাবে।',
+      portrait: { name: 'পোস্টার', use: 'প্রিন্ট · ৩:৪' }, square: { name: 'বর্গাকার', use: 'ফেসবুক পোস্ট · ১:১' },
+      story: { name: 'স্টোরি', use: 'মোবাইল স্টোরি · ৯:১৬' }, landscape: { name: 'ব্যানার', use: 'কভার/ব্যানার · ১৬:৯' },
+    },
+    pdf: { a4: 'PDF (A4)', a3: 'PDF (A3)', preparing: 'PDF তৈরি হচ্ছে…', note: 'প্রিন্টের জন্য A4 বা A3 কাগজের মাপে PDF' },
     errors: {
       NETWORK: 'সার্ভারের সাথে সংযোগ করা যাচ্ছে না। ইন্টারনেট সংযোগ দেখুন।', VALIDATION_ERROR: 'তথ্যগুলো সঠিকভাবে পূরণ করুন।',
       UNAUTHORIZED: 'অনুগ্রহ করে লগইন করুন।', FORBIDDEN: 'এই কাজের অনুমতি নেই।', NOT_FOUND: 'খুঁজে পাওয়া যায়নি।',
@@ -142,7 +148,7 @@ const dict = {
       IMAGE_TOO_SMALL: 'ছবিটি খুব ছোট। কমপক্ষে ৩০০×৩০০ পিক্সেলের ছবি দিন।', FILE_TOO_LARGE: 'ছবির সাইজ ৫ MB এর বেশি হতে পারবে না।',
       PHOTO_NOT_OWNED: 'ছবিটি আবার আপলোড করুন।', TEMPLATE_UNAVAILABLE: 'এই টেমপ্লেটটি এখন পাওয়া যাচ্ছে না।',
       UPGRADE_REQUIRED: 'এই সুবিধার জন্য প্রো বা আল্ট্রা প্যাকেজ দরকার।', PLAN_DOWNGRADE: 'আপনার এখন এর চেয়ে বড় প্যাকেজ সচল আছে।',
-      PAYMENT_FAILED: 'ভেরিফিকেশন কোড বা পিন সঠিক নয়।', PAYMENT_CLOSED: 'এই পেমেন্টটি আর খোলা নেই। আবার চেষ্টা করুন।',
+      PAYMENT_FAILED: 'ভেরিফিকেশন কোড বা পিন সঠিক নয়।', PAYMENT_CLOSED: 'এই পেমেন্টটি আর খোলা নেই। আবার চেষ্টা করুন।', POSTER_NOT_READY: 'পোস্টারটি এখনো তৈরি হয়নি।',
       SLUG_TAKEN: 'এই স্লাগ দিয়ে আগেই একটি টেমপ্লেট আছে।', FALLBACK: 'কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।',
     },
     validation: {
@@ -257,6 +263,12 @@ const dict = {
       payments: 'Payments', paymentStatus: { pending: 'Pending', completed: 'Completed', failed: 'Failed', cancelled: 'Cancelled' },
       ai: 'AI calls (30 days)', aiDesign: 'Design', aiBackground: 'Background', calls: 'Calls', success: 'Success', latency: 'Avg time',
     },
+    sizes: {
+      label: 'Poster size', hint: 'The AI adapts the design to the size you pick.',
+      portrait: { name: 'Poster', use: 'Print · 3:4' }, square: { name: 'Square', use: 'Facebook post · 1:1' },
+      story: { name: 'Story', use: 'Phone story · 9:16' }, landscape: { name: 'Banner', use: 'Cover / banner · 16:9' },
+    },
+    pdf: { a4: 'PDF (A4)', a3: 'PDF (A3)', preparing: 'Preparing PDF…', note: 'Print-ready PDF on A4 or A3 paper' },
     errors: {
       NETWORK: "Can't reach the server. Check your internet connection.", VALIDATION_ERROR: 'Please fill in the details correctly.',
       UNAUTHORIZED: 'Please log in.', FORBIDDEN: "You don't have permission for this.", NOT_FOUND: 'Not found.',
@@ -267,7 +279,7 @@ const dict = {
       IMAGE_TOO_SMALL: 'The image is too small. Use at least 300×300 pixels.', FILE_TOO_LARGE: 'Image size cannot exceed 5 MB.',
       PHOTO_NOT_OWNED: 'Please upload the photo again.', TEMPLATE_UNAVAILABLE: 'This template is currently unavailable.',
       UPGRADE_REQUIRED: 'This needs a Pro or Ultra plan.', PLAN_DOWNGRADE: 'You already have a higher plan active.',
-      PAYMENT_FAILED: 'The verification code or PIN is incorrect.', PAYMENT_CLOSED: 'This payment is no longer open. Please try again.',
+      PAYMENT_FAILED: 'The verification code or PIN is incorrect.', PAYMENT_CLOSED: 'This payment is no longer open. Please try again.', POSTER_NOT_READY: 'The poster is not ready yet.',
       SLUG_TAKEN: 'A template with this slug already exists.', FALLBACK: 'Something went wrong. Please try again.',
     },
     validation: {

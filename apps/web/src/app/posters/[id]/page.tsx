@@ -1,12 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { SIZE_SPECS, type PdfPaper } from '@poster/shared';
 import { useMe, usePoster, useRegenerate, useRemoveWatermark } from '@/lib/queries';
 import { UpgradePrompt } from '@/components/UpgradePrompt';
 import { StatusBadge } from '@/components/StatusBadge';
 import { RegenerateForm } from '@/components/RegenerateForm';
 import { errorMessage } from '@/lib/error-messages';
-import { ApiError } from '@/lib/api';
+import { ApiError, apiDownload } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 
 export default function PosterPage() {
@@ -16,6 +18,15 @@ export default function PosterPage() {
   const regen = useRegenerate(id);
   const unmark = useRemoveWatermark(id);
   const { data: me } = useMe({ optional: true });
+  const [pdfBusy, setPdfBusy] = useState<PdfPaper | null>(null);
+  const [pdfError, setPdfError] = useState<unknown>(null);
+  const downloadPdf = async (paper: PdfPaper) => {
+    setPdfBusy(paper);
+    setPdfError(null);
+    try { await apiDownload(`/posters/${id}/pdf?paper=${paper}`, `poster-${id}-${paper}.pdf`); }
+    catch (err) { setPdfError(err); }
+    finally { setPdfBusy(null); }
+  };
 
   if (poster.isLoading) return <div className="skeleton mx-auto aspect-[3/4] max-w-md" />;
   if (poster.error) {
@@ -33,7 +44,8 @@ export default function PosterPage() {
           <StatusBadge status={p.status} />
         </div>
         {busy && (
-          <div className="card relative flex aspect-[3/4] w-full max-w-md flex-col items-center justify-center gap-4 overflow-hidden" aria-live="polite">
+          <div className="card relative flex w-full max-w-md flex-col items-center justify-center gap-4 overflow-hidden" aria-live="polite"
+            style={{ aspectRatio: `${SIZE_SPECS[p.size].width} / ${SIZE_SPECS[p.size].height}` }}>
             <div className="skeleton absolute inset-0 rounded-none opacity-60" aria-hidden="true" />
             <div className="absolute inset-x-8 top-10 flex flex-col gap-3 opacity-70" aria-hidden="true">
               <div className="skeleton mx-auto h-28 w-28 rounded-full" /><div className="skeleton h-5 w-full" /><div className="skeleton mx-auto h-4 w-2/3" />
@@ -56,8 +68,15 @@ export default function PosterPage() {
                   {t.posterDetail.downloadPng}
                 </a>
                 <a href={p.downloadUrls.jpg} download className="btn btn-ghost px-5 py-3">{t.posterDetail.downloadJpg}</a>
+                {(['a4', 'a3'] as const).map((paper) => (
+                  <button key={paper} type="button" className="btn btn-ghost px-5 py-3" disabled={pdfBusy !== null}
+                    title={t.pdf.note} onClick={() => void downloadPdf(paper)}>
+                    {pdfBusy === paper ? t.pdf.preparing : t.pdf[paper]}
+                  </button>
+                ))}
               </div>
             )}
+            {pdfError !== null && <p role="alert" className="pop text-sm font-medium text-rally">{errorMessage(pdfError)}</p>}
             {p.watermarked && (
               <div className="w-full max-w-md">
                 {me?.plan === 'free' ? (

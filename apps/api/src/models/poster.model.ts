@@ -1,5 +1,5 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { POSTER_STATUSES } from '@poster/shared';
+import { POSTER_SIZES, POSTER_STATUSES } from '@poster/shared';
 import { designSchema } from './template.model.js';
 
 const formSchema = new Schema(
@@ -13,6 +13,7 @@ const posterSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     templateId: { type: Schema.Types.ObjectId, ref: 'Template', required: true },
+    size: { type: String, enum: POSTER_SIZES, default: 'portrait', required: true },
     formData: { type: formSchema, required: true },
     photoIds: { type: [String], required: true },
     design: { type: designSchema, required: false },

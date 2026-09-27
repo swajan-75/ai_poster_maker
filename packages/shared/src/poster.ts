@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HEADLINE_FONTS, MOTIFS, type PosterStatus } from './enums.js';
 import { MAX_PHOTOS } from './limits.js';
 import { objectIdSchema } from './auth.js';
+import { DEFAULT_POSTER_SIZE, POSTER_SIZES, type PosterSize } from './sizes.js';
 
 // Control chars forbidden; ZWJ/ZWNJ (U+200C/U+200D) intentionally allowed.
 // eslint-disable-next-line no-control-regex -- intentional: rejects control chars, preserves Bangla ZWJ/ZWNJ
@@ -44,6 +45,7 @@ export const createPosterSchema = z.object({
   templateId: objectIdSchema,
   formData: posterFormSchema,
   photoIds: z.array(z.string().min(1).max(200)).min(1).max(MAX_PHOTOS),
+  size: z.enum(POSTER_SIZES).default(DEFAULT_POSTER_SIZE),
 });
 export type CreatePosterInput = z.infer<typeof createPosterSchema>;
 
@@ -53,6 +55,7 @@ export type RegenerateInput = z.infer<typeof regenerateSchema>;
 export interface PosterDTO {
   id: string;
   templateId: string;
+  size: PosterSize;
   formData: PosterFormData;
   status: PosterStatus;
   imageUrl: string | null;

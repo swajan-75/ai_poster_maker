@@ -6,3 +6,4 @@ export * from './template.js';
 export * from './poster.js';
 export * from './subscription.js';
 export * from './analytics.js';
+export * from './sizes.js';

@@ -1,4 +1,4 @@
-import type { FocusPoint, LayoutKey, Palette, PosterDesign, PosterFormData } from '@poster/shared';
+import type { FocusPoint, LayoutKey, Palette, PosterDesign, PosterFormData, PosterSize } from '@poster/shared';
 import { victoryLayout } from './layouts/victory.js';
 import { tributeLayout } from './layouts/tribute.js';
 import { campaignLayout } from './layouts/campaign.js';
@@ -6,6 +6,8 @@ import { campaignLayout } from './layouts/campaign.js';
 export interface RenderPhoto { dataUri: string; focus: FocusPoint }
 export interface RenderContext {
   layoutKey: LayoutKey;
+  /** Output size; defaults to the portrait poster. */
+  size?: PosterSize;
   palette: Palette;
   design: PosterDesign;
   form: PosterFormData;

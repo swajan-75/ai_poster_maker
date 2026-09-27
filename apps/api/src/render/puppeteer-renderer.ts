@@ -1,6 +1,6 @@
 import puppeteer, { type Browser, type Page } from 'puppeteer';
-import { POSTER_HEIGHT, POSTER_WIDTH, RENDER_SCALE } from '@poster/shared';
-import type { PosterRenderer } from './renderer.js';
+import { DEFAULT_POSTER_SIZE, SIZE_SPECS, type PosterSize } from '@poster/shared';
+import type { PdfOptions, PosterRenderer } from './renderer.js';
 
 export class PuppeteerRenderer implements PosterRenderer {
   private browser: Promise<Browser> | null = null;
@@ -23,7 +23,7 @@ export class PuppeteerRenderer implements PosterRenderer {
     return this.browser;
   }
 
-  private async withPage<T>(html: string, fn: (page: Page) => Promise<T>): Promise<T> {
+  private async withPage<T>(html: string, fn: (page: Page) => Promise<T>, size: PosterSize = DEFAULT_POSTER_SIZE): Promise<T> {
     const page = await (await this.getBrowser()).newPage();
     try {
       await page.setRequestInterception(true);
@@ -32,7 +32,8 @@ export class PuppeteerRenderer implements PosterRenderer {
         if (url.startsWith('data:') || url === 'about:blank') void req.continue();
         else void req.abort('blockedbyclient');
       });
-      await page.setViewport({ width: POSTER_WIDTH, height: POSTER_HEIGHT, deviceScaleFactor: RENDER_SCALE });
+      const spec = SIZE_SPECS[size];
+      await page.setViewport({ width: spec.width, height: spec.height, deviceScaleFactor: spec.scale });
       await page.setContent(html, { waitUntil: 'load', timeout: 30_000 });
       await page.waitForFunction('window.__fitDone === true', { timeout: 15_000 });
       return await fn(page);
@@ -41,21 +42,28 @@ export class PuppeteerRenderer implements PosterRenderer {
     }
   }
 
-  render(html: string): Promise<Buffer> {
-    return this.withPage(html, async (page) => Buffer.from(await page.screenshot({ type: 'png', omitBackground: false })));
+  render(html: string, size: PosterSize = DEFAULT_POSTER_SIZE): Promise<Buffer> {
+    return this.withPage(html, async (page) => Buffer.from(await page.screenshot({ type: 'png', omitBackground: false })), size);
+  }
+
+  /** The page's HTML must set window.__fitDone like a poster does (the PDF wrapper sets it immediately). */
+  renderPdf(html: string, opts: PdfOptions): Promise<Buffer> {
+    return this.withPage(html, async (page) => Buffer.from(await page.pdf({
+      format: opts.paper === 'a3' ? 'A3' : 'A4', landscape: opts.landscape, printBackground: true, preferCSSPageSize: false,
+    })));
   }
 
   /** Test/diagnostic helper: evaluate an expression after layout + fit. */
-  evaluate<T>(html: string, expression: string): Promise<T> {
-    return this.withPage(html, (page) => page.evaluate(expression) as Promise<T>);
+  evaluate<T>(html: string, expression: string, size?: PosterSize): Promise<T> {
+    return this.withPage(html, (page) => page.evaluate(expression) as Promise<T>, size);
   }
 
   /** Test/diagnostic helper: report every [data-fit] box and whether it still overflows. */
-  measureOverflow(html: string): Promise<{ selector: string; overflow: boolean }[]> {
+  measureOverflow(html: string, size?: PosterSize): Promise<{ selector: string; overflow: boolean }[]> {
     return this.evaluate(html, `[...document.querySelectorAll('[data-fit]')].map(el => ({
       selector: el.className,
       overflow: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
-    }))`);
+    }))`, size);
   }
 
   async close(): Promise<void> {

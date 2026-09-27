@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { isBallotLayout, type PosterDesign, type PosterFormData } from '@poster/shared';
+import { isBallotLayout, type PosterDesign, type PosterFormData, type PosterSize } from '@poster/shared';
 import type { Logger } from '../lib/logger.js';
 import { withTimeout } from '../lib/timeout.js';
 import { PosterModel } from '../models/poster.model.js';
@@ -30,12 +30,12 @@ function templateInfo(t: TemplateDoc): DesignTemplateInfo {
   return { slug: t.slug, title: t.title, occasion: t.occasion, palettes: t.palettes, motifs: t.motifs, defaultDesign: t.defaultDesign as PosterDesign };
 }
 
-async function chooseDesign(posterId: string, t: TemplateDoc, form: PosterFormData, photos: Buffer[], deps: GenerateDeps): Promise<PosterDesign> {
+async function chooseDesign(posterId: string, t: TemplateDoc, form: PosterFormData, photos: Buffer[], size: PosterSize, deps: GenerateDeps): Promise<PosterDesign> {
   const info = templateInfo(t);
   const small = await Promise.all(photos.map((b) => sharp(b).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer()));
   const started = Date.now();
   try {
-    const r = await withTimeout(deps.designProvider.suggestDesign({ template: info, form, photos: small }), DESIGN_TIMEOUT_MS, 'design');
+    const r = await withTimeout(deps.designProvider.suggestDesign({ template: info, form, photos: small, size }), DESIGN_TIMEOUT_MS, 'design');
     await GenerationLogModel.create({ kind: 'design', posterId, model: r.model, prompt: r.prompt, promptTokens: r.promptTokens, outputTokens: r.outputTokens, latencyMs: r.latencyMs, success: true });
     return sanitizeDesign(r.raw, info, photos.length);
   } catch (err) {
@@ -63,11 +63,11 @@ export async function generatePoster(posterId: string, deps: GenerateDeps): Prom
     // Removing the watermark must not change the poster, so reuse the design it was rendered with.
     const design = poster.reuseDesign && poster.design
       ? sanitizeDesign(poster.toObject().design, templateInfo(template), photos.length)
-      : await chooseDesign(posterId, template, form, photos, deps);
+      : await chooseDesign(posterId, template, form, photos, poster.size, deps);
     const palette = template.palettes.find((p) => p.id === design.paletteId) ?? template.palettes[0]!;
     // Ballot layouts draw their own flat print-style background, so skip the AI image entirely.
     const bg = isBallotLayout(template.layoutKey) ? null : await withTimeout(
-      deps.backgrounds.getBackground({ id: template._id.toString(), occasion: template.occasion, palettes: template.palettes }, design.paletteId, design.motif, posterId),
+      deps.backgrounds.getBackground({ id: template._id.toString(), occasion: template.occasion, palettes: template.palettes }, design.paletteId, design.motif, posterId, poster.size),
       BACKGROUND_TIMEOUT_MS, 'background',
     ).catch(() => null);
 
@@ -77,11 +77,11 @@ export async function generatePoster(posterId: string, deps: GenerateDeps): Prom
     })));
 
     const html = renderPosterHtml({
-      layoutKey: template.layoutKey, palette, design, form, photos: photoUris,
+      layoutKey: template.layoutKey, size: poster.size, palette, design, form, photos: photoUris,
       backgroundDataUri: bg ? toDataUri(bg, 'image/jpeg') : null,
       watermark: poster.watermarked,
     });
-    const png = await withTimeout(deps.renderer.render(html), deps.renderTimeoutMs, 'render');
+    const png = await withTimeout(deps.renderer.render(html, poster.size), deps.renderTimeoutMs, 'render');
 
     const stored = await deps.storage.uploadImage(png, { folder: generatedFolder(poster.userId.toString()), publicId: posterId, overwrite: true });
     await PosterModel.updateOne({ _id: posterId }, { $set: { status: 'completed', design, imagePublicId: stored.publicId, imageUrl: stored.url, reuseDesign: false } });

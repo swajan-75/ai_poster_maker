@@ -3,6 +3,7 @@ import request from 'supertest';
 import { useTestDb } from './setup-db.js';
 import { createApp } from '../src/http/app.js';
 import { FakeQueue, makeTestDeps, registerAgent, testEnv } from './helpers.js';
+import { FakeRenderer } from '../src/render/fake-renderer.js';
 import { makeJpeg, sampleForm } from './fixtures.js';
 import { seedTemplates } from '../scripts/seed-data.js';
 import { TemplateModel } from '../src/models/template.model.js';
@@ -14,6 +15,7 @@ import { MemoryStorage } from '../src/services/storage/memory-storage.js';
 useTestDb();
 
 let queue: FakeQueue;
+let renderer: FakeRenderer;
 let storage: MemoryStorage;
 let app: ReturnType<typeof createApp>;
 let victoryId: string;
@@ -22,7 +24,8 @@ let tributeId: string;
 beforeEach(async () => {
   queue = new FakeQueue();
   storage = new MemoryStorage();
-  app = createApp(makeTestDeps({ queue, storage, env: testEnv({ GENERATION_RATE_LIMIT: '100' }) }));
+  renderer = new FakeRenderer();
+  app = createApp(makeTestDeps({ queue, storage, renderer, env: testEnv({ GENERATION_RATE_LIMIT: '100' }) }));
   await seedTemplates();
   victoryId = (await TemplateModel.findOne({ slug: 'victory-day-classic' }))!.id;
   tributeId = (await TemplateModel.findOne({ slug: 'tribute-mourning' }))!.id;
@@ -319,5 +322,52 @@ describe('POST /api/posters/:id/remove-watermark', () => {
     const id = await completedPoster(a.agent);
     await setPlan(b.user.id, 'pro');
     await b.agent.post(`/api/posters/${id}/remove-watermark`).expect(404);
+  });
+});
+
+describe('poster sizes', () => {
+  it('defaults to portrait; stores the chosen size; rejects unknown sizes', async () => {
+    const { agent } = await registerAgent(app);
+    expect((await create(agent)).body.size).toBe('portrait');
+    const res = await create(agent, { size: 'story' });
+    expect(res.status).toBe(202);
+    expect(res.body.size).toBe('story');
+    expect((await PosterModel.findById(res.body.id))!.size).toBe('story');
+    expect((await create(agent, { size: 'a0' })).status).toBe(400);
+  });
+});
+
+describe('GET /api/posters/:id/pdf', () => {
+  async function completedWithImage(agent: ReturnType<typeof request.agent>, size = 'portrait') {
+    const id = (await create(agent, { size })).body.id as string;
+    const p = (await PosterModel.findById(id))!;
+    const stored = await storage.uploadImage(await makeJpeg(900, 1200), { folder: `poster-maker/generated/${p.userId}`, publicId: id });
+    await PosterModel.updateOne({ _id: id }, { status: 'completed', imagePublicId: stored.publicId });
+    return id;
+  }
+
+  it('returns an A4 PDF by default, A3 on request, landscape page for landscape posters', async () => {
+    const { agent } = await registerAgent(app);
+    const id = await completedWithImage(agent);
+    const res = await agent.get(`/api/posters/${id}/pdf`).expect(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toBe(`attachment; filename="poster-${id}-a4.pdf"`);
+    expect(renderer.pdfCalls.at(-1)).toEqual({ paper: 'a4', landscape: false });
+    expect(renderer.calls.at(-1)).toContain('data:image/jpeg;base64,');
+
+    const wide = await completedWithImage(agent, 'landscape');
+    await agent.get(`/api/posters/${wide}/pdf?paper=a3`).expect(200);
+    expect(renderer.pdfCalls.at(-1)).toEqual({ paper: 'a3', landscape: true });
+    await agent.get(`/api/posters/${wide}/pdf?paper=letter`).expect(400);
+  });
+
+  it('not finished → 409 POSTER_NOT_READY; other users → 404', async () => {
+    const a = await registerAgent(app);
+    const b = await registerAgent(app);
+    const pending = (await create(a.agent)).body.id;
+    const res = await a.agent.get(`/api/posters/${pending}/pdf`).expect(409);
+    expect(res.body.error.code).toBe('POSTER_NOT_READY');
+    const done = await completedWithImage(a.agent);
+    await b.agent.get(`/api/posters/${done}/pdf`).expect(404);
   });
 });
