@@ -20,6 +20,9 @@ const posterSchema = new Schema(
     imageUrl: String,
     status: { type: String, enum: POSTER_STATUSES, default: 'queued', required: true },
     regenerateCount: { type: Number, default: 0, min: 0 },
+    watermarked: { type: Boolean, default: false, required: true },
+    // Set by remove-watermark: re-render with the stored design instead of asking the AI again.
+    reuseDesign: { type: Boolean, default: false },
     error: String,
   },
   { timestamps: true },

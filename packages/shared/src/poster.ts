@@ -58,6 +58,7 @@ export interface PosterDTO {
   imageUrl: string | null;
   downloadUrls: { png: string; jpg: string } | null;
   regenerationsLeft: number;
+  watermarked: boolean;
   error: string | null;
   createdAt: string;
 }

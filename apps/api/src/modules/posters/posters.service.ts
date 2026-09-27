@@ -1,6 +1,8 @@
 import { isValidObjectId } from 'mongoose';
-import { MAX_REGENERATIONS, type CreatePosterInput, type PosterFormData, type RegenerateInput, type UserRole } from '@poster/shared';
-import type { Env } from '../../config/env.js';
+import {
+  MAX_REGENERATIONS, PLAN_FEATURES,
+  type CreatePosterInput, type Plan, type PosterFormData, type RegenerateInput, type UserRole,
+} from '@poster/shared';
 import { AppError, badRequest, conflict, notFound, tooMany, unprocessable } from '../../lib/errors.js';
 import { findBlockedTerm } from '../../lib/moderation.js';
 import { PosterModel, type PosterDoc } from '../../models/poster.model.js';
@@ -8,11 +10,21 @@ import type { PosterQueue } from '../../jobs/job-queue.js';
 import type { StorageService } from '../../services/storage/storage.js';
 import { isOwnedUpload } from '../../services/storage/paths.js';
 import { getActiveTemplate } from '../templates/templates.service.js';
+import { TemplateModel } from '../../models/template.model.js';
+import { getUserPlan, postersToday } from '../billing/subscription.service.js';
 
 export type AuthUser = { id: string; role: UserRole };
 
 function normalizeForm<T extends Partial<PosterFormData>>(form: T): T {
   return Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.normalize('NFC') : v])) as T;
+}
+
+const upgradeRequired = (reason: 'premium_template' | 'watermark', msg: string) =>
+  new AppError(403, 'UPGRADE_REQUIRED', msg, { reason });
+
+function assertTemplateAllowed(template: { isFree: boolean }, plan: Plan): void {
+  if (!template.isFree && !PLAN_FEATURES[plan].premiumTemplates)
+    throw upgradeRequired('premium_template', 'This template needs a Pro or Ultra plan');
 }
 
 function assertClean(form: Partial<PosterFormData>): void {
@@ -21,10 +33,12 @@ function assertClean(form: Partial<PosterFormData>): void {
   }
 }
 
-export async function createPoster(user: AuthUser, input: CreatePosterInput, deps: { queue: PosterQueue; env: Env }): Promise<PosterDoc> {
+export async function createPoster(user: AuthUser, input: CreatePosterInput, deps: { queue: PosterQueue }): Promise<PosterDoc> {
   const template = await getActiveTemplate(input.templateId).catch(() => {
     throw unprocessable('TEMPLATE_UNAVAILABLE', 'Template is not available');
   });
+  const plan = await getUserPlan(user.id);
+  assertTemplateAllowed(template, plan);
   if (input.photoIds.length > template.photoSlots)
     throw badRequest('VALIDATION_ERROR', `This template accepts at most ${template.photoSlots} photo(s)`);
   if (!input.photoIds.every((id) => isOwnedUpload(id, user.id)))
@@ -33,11 +47,13 @@ export async function createPoster(user: AuthUser, input: CreatePosterInput, dep
   const formData = normalizeForm(input.formData);
   assertClean(formData);
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const today = await PosterModel.countDocuments({ userId: user.id, createdAt: { $gte: since } });
-  if (today >= deps.env.DAILY_POSTER_LIMIT) throw tooMany('DAILY_LIMIT', 'Daily poster limit reached');
+  const { dailyPosters, watermark } = PLAN_FEATURES[plan];
+  if ((await postersToday(user.id)) >= dailyPosters)
+    throw new AppError(429, 'DAILY_LIMIT', 'Daily poster limit reached', { plan, limit: dailyPosters });
 
-  const poster = await PosterModel.create({ userId: user.id, templateId: template._id, formData, photoIds: input.photoIds });
+  const poster = await PosterModel.create({
+    userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, watermarked: watermark,
+  });
   deps.queue.enqueue(poster.id);
   return poster;
 }
@@ -59,7 +75,13 @@ export async function listPosters(ownerId: string, page: number, limit: number) 
 
 export async function regeneratePoster(id: string, user: AuthUser, input: RegenerateInput, deps: { queue: PosterQueue }): Promise<PosterDoc> {
   if (!isValidObjectId(id)) throw notFound('Poster not found');
-  const $set: Record<string, unknown> = { status: 'queued' };
+  const existing = await PosterModel.findOne({ _id: id, userId: user.id }, { templateId: 1 });
+  if (!existing) throw notFound('Poster not found');
+  const plan = await getUserPlan(user.id);
+  const template = await TemplateModel.findById(existing.templateId, { isFree: 1 });
+  if (template) assertTemplateAllowed(template, plan);
+  // The watermark follows the plan at the time of (re)generation.
+  const $set: Record<string, unknown> = { status: 'queued', watermarked: PLAN_FEATURES[plan].watermark, reuseDesign: false };
   if (input.formData) {
     const patch = normalizeForm(input.formData);
     assertClean(patch);
@@ -89,4 +111,24 @@ export async function deletePoster(id: string, user: AuthUser, deps: { storage: 
   await PosterModel.deleteOne({ _id: p._id });
   const files = [...p.photoIds, ...(p.imagePublicId ? [p.imagePublicId] : [])];
   await Promise.allSettled(files.map((f) => deps.storage.deleteImage(f)));
+}
+
+/** Re-renders a completed poster with the same design, minus the watermark. Paid plans only; free of charge. */
+export async function removeWatermark(id: string, user: AuthUser, deps: { queue: PosterQueue }): Promise<PosterDoc> {
+  if (!isValidObjectId(id)) throw notFound('Poster not found');
+  const plan = await getUserPlan(user.id);
+  if (PLAN_FEATURES[plan].watermark) throw upgradeRequired('watermark', 'Upgrade to Pro or Ultra to remove the watermark');
+  const updated = await PosterModel.findOneAndUpdate(
+    { _id: id, userId: user.id, status: 'completed', watermarked: true },
+    { $set: { status: 'queued', watermarked: false, reuseDesign: true }, $unset: { error: 1 } },
+    { new: true },
+  );
+  if (!updated) {
+    const p = await PosterModel.findOne({ _id: id, userId: user.id });
+    if (!p) throw notFound('Poster not found');
+    if (p.status === 'queued' || p.status === 'generating') throw conflict('POSTER_BUSY', 'Poster is already being generated');
+    return p; // already clean (or failed): nothing to do
+  }
+  deps.queue.enqueue(updated.id);
+  return updated;
 }

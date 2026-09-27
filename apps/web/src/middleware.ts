@@ -5,4 +5,4 @@ export function middleware(req: NextRequest) {
   url.searchParams.set('next', req.nextUrl.pathname);
   return NextResponse.redirect(url);
 }
-export const config = { matcher: ['/create/:path*', '/posters/:path*', '/history', '/admin/:path*'] };
+export const config = { matcher: ['/create/:path*', '/posters/:path*', '/history', '/admin/:path*', '/billing/:path*'] };

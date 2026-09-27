@@ -18,7 +18,6 @@ const schema = z
     CLOUDINARY_API_SECRET: z.string().optional(),
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
     RENDER_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60_000),
-    DAILY_POSTER_LIMIT: z.coerce.number().int().min(1).default(20),
     GENERATION_RATE_LIMIT: z.coerce.number().int().min(1).default(10),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   })

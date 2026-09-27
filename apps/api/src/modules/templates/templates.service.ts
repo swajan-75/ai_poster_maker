@@ -8,6 +8,7 @@ export function toTemplateDTO(t: TemplateDoc): TemplateDTO {
     id: t._id.toString(), slug: t.slug, title: t.title, occasion: t.occasion, layoutKey: t.layoutKey,
     photoSlots: t.photoSlots, thumbnailUrl: t.thumbnailUrl, defaultHeadline: t.defaultHeadline,
     palettes: t.palettes.map((p) => ({ id: p.id, name: p.name, primary: p.primary, secondary: p.secondary, accent: p.accent, text: p.text, footerBg: p.footerBg })),
+    isFree: t.isFree,
   };
 }
 

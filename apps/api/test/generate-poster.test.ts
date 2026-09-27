@@ -29,6 +29,31 @@ function deps(over: Partial<GenerateDeps> = {}): GenerateDeps & { storage: Memor
 }
 
 describe('generatePoster', () => {
+  it('renders the watermark for watermarked posters only', async () => {
+    const d = deps();
+    const { poster } = await seedPosterFixture(d.storage);
+    await PosterModel.updateOne({ _id: poster.id }, { watermarked: true });
+    await generatePoster(poster.id, d);
+    expect(d.renderer.calls[0]).toContain('wm-badge');
+
+    const clean = await seedPosterFixture(d.storage);
+    await generatePoster(clean.poster.id, d);
+    expect(d.renderer.calls[1]).not.toContain('wm-badge');
+  });
+
+  it('reuseDesign re-renders with the stored design without calling the AI', async () => {
+    const d = deps();
+    const { poster } = await seedPosterFixture(d.storage, { photos: 1 });
+    const design = { paletteId: 'sunrise-red', motif: 'doves', headlineFont: 'hind-siliguri', headlineScale: 1.2, photoFocus: [{ x: 0.1, y: 0.9 }] };
+    await PosterModel.updateOne({ _id: poster.id }, { design, reuseDesign: true });
+    await generatePoster(poster.id, d);
+    const p = (await PosterModel.findById(poster.id))!;
+    expect(p.status).toBe('completed');
+    expect(p.reuseDesign).toBe(false);
+    expect(p.design).toMatchObject({ paletteId: 'sunrise-red', motif: 'doves', headlineScale: 1.2 });
+    expect(await GenerationLogModel.countDocuments({ kind: 'design' })).toBe(0);
+  });
+
   it('happy path: completed with stored image, design and success log', async () => {
     const d = deps();
     const { poster, userId } = await seedPosterFixture(d.storage);

@@ -37,6 +37,13 @@ describe('renderPosterHtml', () => {
     expect(html).toContain('window.__fitDone');
   });
 
+  it('adds the tiled watermark only when asked', () => {
+    expect(renderPosterHtml(baseCtx())).not.toContain('class="wm"');
+    const html = renderPosterHtml(baseCtx({ watermark: true }));
+    expect(html).toContain('class="wm"');
+    expect(html).toContain('wm-badge');
+  });
+
   it('renders exactly one <img> per photo slot used', () => {
     const html = renderPosterHtml(baseCtx({ photos: baseCtx().photos.slice(0, 2), layoutKey: 'campaign' }));
     expect(html.match(/class="photo/g)?.length).toBe(2);

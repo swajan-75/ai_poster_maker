@@ -2,8 +2,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AdminPosterListDTO, AdminTemplateCreateInput, AdminTemplateDTO, AdminTemplateUpdateInput, AdminUserListDTO,
-  AuthResponse, CreatePosterInput, LoginInput, Occasion, PosterDTO, PosterListDTO, PosterStatus, PublicUser,
-  RegenerateInput, RegisterInput, TemplateDTO, UploadedPhotoDTO,
+  AuthResponse, BkashExecuteInput, CreatePosterInput, ExecutePaymentResponse, LoginInput, Occasion, PaidPlan, PaymentDTO,
+  PosterDTO, PosterListDTO, PosterStatus, PublicUser, RegenerateInput, RegisterInput, SubscriptionDTO, TemplateDTO,
+  UploadedPhotoDTO,
 } from '@poster/shared';
 import { apiFetch, ApiError } from './api';
 import { clearToken, setToken } from './auth-token';
@@ -14,6 +15,8 @@ export const qk = {
   template: (id: string) => ['template', id] as const,
   poster: (id: string) => ['poster', id] as const,
   myPosters: (page: number) => ['myPosters', page] as const,
+  subscription: ['subscription'] as const,
+  payment: (id: string) => ['payment', id] as const,
   adminTemplates: ['adminTemplates'] as const,
   adminPosters: (page: number, status?: PosterStatus) => ['adminPosters', page, status ?? 'all'] as const,
   adminUsers: (page: number, blocked?: boolean) => ['adminUsers', page, blocked ?? 'all'] as const,
@@ -82,7 +85,11 @@ export function useCreatePoster() {
   const qc = useQueryClient();
   return useMutation<PosterDTO, ApiError, CreatePosterInput>({
     mutationFn: (input) => apiFetch<PosterDTO>('/posters', { method: 'POST', json: input }),
-    onSuccess: (p) => { qc.setQueryData(qk.poster(p.id), p); void qc.invalidateQueries({ queryKey: ['myPosters'] }); },
+    onSuccess: (p) => {
+      qc.setQueryData(qk.poster(p.id), p);
+      void qc.invalidateQueries({ queryKey: ['myPosters'] });
+      void qc.invalidateQueries({ queryKey: qk.subscription });
+    },
   });
 }
 
@@ -113,6 +120,56 @@ export function useDeletePoster() {
   return useMutation<void, ApiError, string>({
     mutationFn: (id) => apiFetch<void>(`/posters/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['myPosters'] }),
+  });
+}
+
+export function useRemoveWatermark(id: string) {
+  const qc = useQueryClient();
+  return useMutation<PosterDTO, ApiError, void>({
+    mutationFn: () => apiFetch<PosterDTO>(`/posters/${id}/remove-watermark`, { method: 'POST' }),
+    onSuccess: (p) => qc.setQueryData(qk.poster(id), p),
+  });
+}
+
+// --- Subscription & demo bKash payments ---
+
+export function useSubscription(opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.subscription,
+    queryFn: () => apiFetch<SubscriptionDTO>('/billing/subscription'),
+    enabled: opts.enabled ?? true,
+  });
+}
+
+export function useCheckout() {
+  return useMutation<PaymentDTO, ApiError, PaidPlan>({
+    mutationFn: (plan) => apiFetch<PaymentDTO>('/billing/checkout', { method: 'POST', json: { plan } }),
+  });
+}
+
+export function usePayment(id: string) {
+  return useQuery({ queryKey: qk.payment(id), queryFn: () => apiFetch<PaymentDTO>(`/billing/payments/${id}`), staleTime: 0 });
+}
+
+export function useExecutePayment(id: string) {
+  const qc = useQueryClient();
+  return useMutation<ExecutePaymentResponse, ApiError, BkashExecuteInput>({
+    mutationFn: (input) => apiFetch<ExecutePaymentResponse>(`/billing/payments/${id}/execute`, { method: 'POST', json: input }),
+    onSuccess: (r) => {
+      qc.setQueryData(qk.payment(id), r.payment);
+      qc.setQueryData(qk.subscription, r.subscription);
+      void qc.invalidateQueries({ queryKey: qk.me });
+    },
+    // A failed attempt may have closed the session (3 strikes) — refresh it.
+    onError: () => { void qc.invalidateQueries({ queryKey: qk.payment(id) }); },
+  });
+}
+
+export function useCancelPayment(id: string) {
+  const qc = useQueryClient();
+  return useMutation<PaymentDTO, ApiError, void>({
+    mutationFn: () => apiFetch<PaymentDTO>(`/billing/payments/${id}/cancel`, { method: 'POST' }),
+    onSuccess: (p) => qc.setQueryData(qk.payment(id), p),
   });
 }
 

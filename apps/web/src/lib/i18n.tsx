@@ -27,7 +27,7 @@ export function setLocale(locale: Locale) {
 
 const dict = {
   bn: {
-    common: { appName: 'পোস্টার মেকার', templates: 'টেমপ্লেট', myPosters: 'আমার পোস্টার', admin: 'অ্যাডমিন', login: 'লগইন', logout: 'লগআউট', retry: 'আবার চেষ্টা', switchToLabel: 'English', photoCount: (n: number) => `${bnNum(n)}টি ছবি` },
+    common: { appName: 'পোস্টার মেকার', templates: 'টেমপ্লেট', myPosters: 'আমার পোস্টার', admin: 'অ্যাডমিন', pricing: 'প্যাকেজ', login: 'লগইন', logout: 'লগআউট', retry: 'আবার চেষ্টা', switchToLabel: 'English', photoCount: (n: number) => `${bnNum(n)}টি ছবি` },
     auth: {
       pitch: 'আপনার প্রচারণার পোস্টার, মিনিটেই।', pitchSub: 'টেমপ্লেট, AI ডিজাইন আর প্রিন্ট-মানের ডাউনলোড — সব এক জায়গায়।',
       newAccountTitle: 'নতুন অ্যাকাউন্ট', loginTitle: 'লগইন', name: 'নাম', email: 'ইমেইল', password: 'পাসওয়ার্ড',
@@ -90,6 +90,34 @@ const dict = {
       block: 'ব্লক করুন', unblock: 'আনব্লক করুন', confirmBlock: 'এই ব্যবহারকারীকে ব্লক করবেন?', cannotBlockSelf: 'নিজেকে ব্লক করা যাবে না',
       empty: 'কিছু পাওয়া যায়নি।', prev: 'আগের', next: 'পরের',
     },
+    plans: { free: 'ফ্রি', pro: 'প্রো', ultra: 'আল্ট্রা' },
+    pricingPage: {
+      title: 'আপনার প্যাকেজ বেছে নিন', sub: 'এক মাসের সাবস্ক্রিপশন, বিকাশে পেমেন্ট। যেকোনো সময় রিনিউ করুন।',
+      perMonth: '/মাস', current: 'বর্তমান প্যাকেজ', popular: 'জনপ্রিয়',
+      dailyPosters: (n: number) => `দিনে ${bnNum(n)}টি পোস্টার`, watermark: 'পোস্টারে ওয়াটারমার্ক থাকবে', noWatermark: 'ওয়াটারমার্ক ছাড়া পোস্টার',
+      freeTemplatesOnly: 'শুধু ফ্রি টেমপ্লেট', premiumTemplates: 'সব প্রিমিয়াম টেমপ্লেট',
+      buy: 'বিকাশে কিনুন', renew: 'আরও ১ মাস বাড়ান', included: 'আপনার প্যাকেজে আছে', loginToBuy: 'কিনতে লগইন করুন',
+      activeUntil: (d: string) => `${d} পর্যন্ত সচল`, usedToday: (used: number, limit: number) => `আজ ${bnNum(used)}/${bnNum(limit)}টি পোস্টার তৈরি হয়েছে`,
+    },
+    upgrade: {
+      premiumBadge: 'প্রিমিয়াম', premiumTitle: 'এটি একটি প্রিমিয়াম টেমপ্লেট',
+      premiumBody: 'প্রো বা আল্ট্রা প্যাকেজে আপগ্রেড করে সব প্রিমিয়াম টেমপ্লেট ব্যবহার করুন।',
+      watermarkTitle: 'ওয়াটারমার্ক সরাতে চান?', watermarkBody: 'প্রো বা আল্ট্রা প্যাকেজে আপগ্রেড করলে পোস্টার ওয়াটারমার্ক ছাড়া পাবেন।',
+      limitTitle: 'আজকের সীমা শেষ', limitBody: 'আরও পোস্টার বানাতে প্যাকেজ আপগ্রেড করুন।',
+      cta: 'প্যাকেজ আপগ্রেড করুন', removeWatermark: 'ওয়াটারমার্ক সরান', removing: 'ওয়াটারমার্ক সরানো হচ্ছে…',
+      watermarkedNote: 'ফ্রি প্যাকেজের পোস্টারে ওয়াটারমার্ক থাকে।',
+    },
+    payment: {
+      demoBanner: 'ডেমো পেমেন্ট — কোনো আসল টাকা কাটা হবে না। আসল পিন দেবেন না।',
+      merchant: 'পোস্টার মেকার', invoice: 'ইনভয়েস', amount: 'পরিমাণ', plan: (p: string) => `${p} প্যাকেজ — ১ মাস`,
+      walletLabel: 'আপনার বিকাশ অ্যাকাউন্ট নম্বর', walletPlaceholder: 'যেমন: 01XXXXXXXXX', walletError: 'সঠিক ১১ সংখ্যার মোবাইল নম্বর দিন',
+      otpLabel: 'ভেরিফিকেশন কোড', otpHint: (code: string) => `ডেমো কোড: ${code}`, otpError: '৬ সংখ্যার কোড দিন',
+      pinLabel: 'বিকাশ পিন', pinHint: (pin: string) => `ডেমো পিন: ${pin}`, pinError: '৫ সংখ্যার পিন দিন',
+      proceed: 'এগিয়ে যান', confirm: 'কনফার্ম', cancel: 'বাতিল', processing: 'প্রসেস হচ্ছে…', back: 'পিছনে',
+      successTitle: 'পেমেন্ট সফল হয়েছে', successBody: (plan: string, d: string) => `আপনার ${plan} প্যাকেজ ${d} পর্যন্ত সচল।`,
+      trxId: 'ট্রানজেকশন আইডি', closedTitle: 'এই পেমেন্টটি আর খোলা নেই', closedBody: 'পেমেন্টটি বাতিল, ব্যর্থ বা মেয়াদোত্তীর্ণ হয়েছে। আবার চেষ্টা করুন।',
+      backToPricing: 'প্যাকেজে ফিরে যান', goCreate: 'পোস্টার তৈরি করুন', expiresIn: (m: number) => `${bnNum(m)} মিনিটের মধ্যে পেমেন্ট সম্পন্ন করুন`,
+    },
     errors: {
       NETWORK: 'সার্ভারের সাথে সংযোগ করা যাচ্ছে না। ইন্টারনেট সংযোগ দেখুন।', VALIDATION_ERROR: 'তথ্যগুলো সঠিকভাবে পূরণ করুন।',
       UNAUTHORIZED: 'অনুগ্রহ করে লগইন করুন।', FORBIDDEN: 'এই কাজের অনুমতি নেই।', NOT_FOUND: 'খুঁজে পাওয়া যায়নি।',
@@ -99,6 +127,8 @@ const dict = {
       CONTENT_BLOCKED: 'লেখায় নিষিদ্ধ শব্দ রয়েছে। অনুগ্রহ করে পরিবর্তন করুন।', UNSUPPORTED_IMAGE: 'শুধু JPG, PNG বা WEBP ছবি দিন।',
       IMAGE_TOO_SMALL: 'ছবিটি খুব ছোট। কমপক্ষে ৩০০×৩০০ পিক্সেলের ছবি দিন।', FILE_TOO_LARGE: 'ছবির সাইজ ৫ MB এর বেশি হতে পারবে না।',
       PHOTO_NOT_OWNED: 'ছবিটি আবার আপলোড করুন।', TEMPLATE_UNAVAILABLE: 'এই টেমপ্লেটটি এখন পাওয়া যাচ্ছে না।',
+      UPGRADE_REQUIRED: 'এই সুবিধার জন্য প্রো বা আল্ট্রা প্যাকেজ দরকার।', PLAN_DOWNGRADE: 'আপনার এখন এর চেয়ে বড় প্যাকেজ সচল আছে।',
+      PAYMENT_FAILED: 'ভেরিফিকেশন কোড বা পিন সঠিক নয়।', PAYMENT_CLOSED: 'এই পেমেন্টটি আর খোলা নেই। আবার চেষ্টা করুন।',
       SLUG_TAKEN: 'এই স্লাগ দিয়ে আগেই একটি টেমপ্লেট আছে।', FALLBACK: 'কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।',
     },
     validation: {
@@ -108,7 +138,7 @@ const dict = {
     },
   },
   en: {
-    common: { appName: 'Poster Maker', templates: 'Templates', myPosters: 'My Posters', admin: 'Admin', login: 'Log in', logout: 'Log out', retry: 'Retry', switchToLabel: 'বাংলা', photoCount: (n: number) => `${n} photo${n === 1 ? '' : 's'}` },
+    common: { appName: 'Poster Maker', templates: 'Templates', myPosters: 'My Posters', admin: 'Admin', pricing: 'Pricing', login: 'Log in', logout: 'Log out', retry: 'Retry', switchToLabel: 'বাংলা', photoCount: (n: number) => `${n} photo${n === 1 ? '' : 's'}` },
     auth: {
       pitch: 'Your campaign posters, in minutes.', pitchSub: 'Templates, AI design and print-quality downloads — all in one place.',
       newAccountTitle: 'New account', loginTitle: 'Log in', name: 'Name', email: 'Email', password: 'Password',
@@ -171,6 +201,34 @@ const dict = {
       block: 'Block', unblock: 'Unblock', confirmBlock: 'Block this user?', cannotBlockSelf: 'You cannot block yourself',
       empty: 'Nothing found.', prev: 'Previous', next: 'Next',
     },
+    plans: { free: 'Free', pro: 'Pro', ultra: 'Ultra' },
+    pricingPage: {
+      title: 'Choose your plan', sub: 'One-month subscription, paid with bKash. Renew any time.',
+      perMonth: '/month', current: 'Current plan', popular: 'Popular',
+      dailyPosters: (n: number) => `${n} posters per day`, watermark: 'Posters carry a watermark', noWatermark: 'No watermark',
+      freeTemplatesOnly: 'Free templates only', premiumTemplates: 'All premium templates',
+      buy: 'Buy with bKash', renew: 'Extend by 1 month', included: 'Included in your plan', loginToBuy: 'Log in to buy',
+      activeUntil: (d: string) => `Active until ${d}`, usedToday: (used: number, limit: number) => `${used}/${limit} posters created today`,
+    },
+    upgrade: {
+      premiumBadge: 'Premium', premiumTitle: 'This is a premium template',
+      premiumBody: 'Upgrade to Pro or Ultra to use every premium template.',
+      watermarkTitle: 'Want to remove the watermark?', watermarkBody: 'Upgrade to Pro or Ultra to get your posters without a watermark.',
+      limitTitle: "Today's limit reached", limitBody: 'Upgrade your plan to create more posters.',
+      cta: 'Upgrade plan', removeWatermark: 'Remove watermark', removing: 'Removing watermark…',
+      watermarkedNote: 'Free-plan posters carry a watermark.',
+    },
+    payment: {
+      demoBanner: 'Demo payment — no real money is charged. Do not enter your real PIN.',
+      merchant: 'Poster Maker', invoice: 'Invoice', amount: 'Amount', plan: (p: string) => `${p} plan — 1 month`,
+      walletLabel: 'Your bKash account number', walletPlaceholder: 'e.g. 01XXXXXXXXX', walletError: 'Enter a valid 11-digit mobile number',
+      otpLabel: 'Verification code', otpHint: (code: string) => `Demo code: ${code}`, otpError: 'Enter the 6-digit code',
+      pinLabel: 'bKash PIN', pinHint: (pin: string) => `Demo PIN: ${pin}`, pinError: 'Enter the 5-digit PIN',
+      proceed: 'Proceed', confirm: 'Confirm', cancel: 'Cancel', processing: 'Processing…', back: 'Back',
+      successTitle: 'Payment successful', successBody: (plan: string, d: string) => `Your ${plan} plan is active until ${d}.`,
+      trxId: 'Transaction ID', closedTitle: 'This payment is no longer open', closedBody: 'It was cancelled, failed or expired. Please try again.',
+      backToPricing: 'Back to plans', goCreate: 'Create a poster', expiresIn: (m: number) => `Complete the payment within ${m} minutes`,
+    },
     errors: {
       NETWORK: "Can't reach the server. Check your internet connection.", VALIDATION_ERROR: 'Please fill in the details correctly.',
       UNAUTHORIZED: 'Please log in.', FORBIDDEN: "You don't have permission for this.", NOT_FOUND: 'Not found.',
@@ -180,6 +238,8 @@ const dict = {
       CONTENT_BLOCKED: 'The text contains prohibited words. Please change it.', UNSUPPORTED_IMAGE: 'Please use a JPG, PNG or WEBP image.',
       IMAGE_TOO_SMALL: 'The image is too small. Use at least 300×300 pixels.', FILE_TOO_LARGE: 'Image size cannot exceed 5 MB.',
       PHOTO_NOT_OWNED: 'Please upload the photo again.', TEMPLATE_UNAVAILABLE: 'This template is currently unavailable.',
+      UPGRADE_REQUIRED: 'This needs a Pro or Ultra plan.', PLAN_DOWNGRADE: 'You already have a higher plan active.',
+      PAYMENT_FAILED: 'The verification code or PIN is incorrect.', PAYMENT_CLOSED: 'This payment is no longer open. Please try again.',
       SLUG_TAKEN: 'A template with this slug already exists.', FALLBACK: 'Something went wrong. Please try again.',
     },
     validation: {

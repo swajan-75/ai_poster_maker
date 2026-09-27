@@ -45,17 +45,20 @@ const SAMPLE_FORM: PosterFormData = {
 };
 
 const slugs = process.argv.slice(2);
-const templates = SEED_TEMPLATES.filter((t) => t.layoutKey.startsWith('ballot_') && (slugs.length === 0 || slugs.includes(t.slug)));
+// Named slugs render any template; with no args, only the ballot templates (their thumbnails are code-drawn).
+const templates = SEED_TEMPLATES.filter((t) => (slugs.length ? slugs.includes(t.slug) : t.layoutKey.startsWith('ballot_')));
 const renderer = new PuppeteerRenderer();
 const photos = [await svgPhoto(person('#C9D6DF', '#23303D')), await svgPhoto(boat), await svgPhoto(person('#E6D9C8', '#3A3A3A'))];
+// Non-ballot layouts use every slot for people, so no ballot symbol.
+const portraits = [photos[0]!, await svgPhoto(person('#D8E4C8', '#2E4A3A')), photos[2]!];
 await mkdir('out', { recursive: true });
 try {
   for (const t of templates) {
     for (const palette of t.palettes as Palette[]) {
       const html = renderPosterHtml({
         layoutKey: t.layoutKey, palette, design: { ...t.defaultDesign, paletteId: palette.id },
-        form: SAMPLE_FORM,
-        photos: photos.slice(0, t.photoSlots), backgroundDataUri: null,
+        form: t.layoutKey.startsWith('ballot_') ? SAMPLE_FORM : { ...SAMPLE_FORM, headline: t.defaultHeadline, tagline: '' },
+        photos: (t.layoutKey.startsWith('ballot_') ? photos : portraits).slice(0, t.photoSlots), backgroundDataUri: null,
       });
       const png = await renderer.render(html);
       await writeFile(`out/${t.slug}-${palette.id}.png`, png);

@@ -16,6 +16,7 @@ export function toPosterDTO(p: PosterDoc, storage: StorageService): PosterDTO {
           jpg: storage.getUrl(p.imagePublicId!, { format: 'jpg', download: true, version }) }
       : null,
     regenerationsLeft: Math.max(0, MAX_REGENERATIONS - p.regenerateCount),
+    watermarked: p.watermarked,
     error: p.error ?? null,
     createdAt: p.createdAt.toISOString(),
   };

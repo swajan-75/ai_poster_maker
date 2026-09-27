@@ -21,7 +21,7 @@ let tributeId: string;
 beforeEach(async () => {
   queue = new FakeQueue();
   storage = new MemoryStorage();
-  app = createApp(makeTestDeps({ queue, storage, env: testEnv({ DAILY_POSTER_LIMIT: '3', GENERATION_RATE_LIMIT: '100' }) }));
+  app = createApp(makeTestDeps({ queue, storage, env: testEnv({ GENERATION_RATE_LIMIT: '100' }) }));
   await seedTemplates();
   victoryId = (await TemplateModel.findOne({ slug: 'victory-day-classic' }))!.id;
   tributeId = (await TemplateModel.findOne({ slug: 'tribute-mourning' }))!.id;
@@ -35,6 +35,12 @@ async function upload(agent: ReturnType<typeof request.agent>) {
 async function create(agent: ReturnType<typeof request.agent>, over: Record<string, unknown> = {}) {
   const photoId = await upload(agent);
   return agent.post('/api/posters').send({ templateId: victoryId, formData: sampleForm, photoIds: [photoId], ...over });
+}
+
+async function completedPoster(agent: ReturnType<typeof request.agent>) {
+  const id = (await create(agent)).body.id as string;
+  await PosterModel.updateOne({ _id: id }, { status: 'completed' });
+  return id;
 }
 
 describe('POST /api/posters', () => {
@@ -202,5 +208,87 @@ describe('DELETE /api/posters/:id', () => {
     await a.agent.delete(`/api/posters/${id}`).expect(204);
     expect(await PosterModel.findById(id)).toBeNull();
     expect(storage.has(photoId)).toBe(false);
+  });
+});
+
+const setPlan = (userId: string, plan: 'pro' | 'ultra', days = 30) =>
+  UserModel.updateOne({ _id: userId }, { plan, planExpiresAt: new Date(Date.now() + days * 86_400_000) });
+
+describe('subscription plans', () => {
+  const royalId = async () => (await TemplateModel.findOne({ slug: 'victory-day-royal' }))!.id as string;
+
+  it('free plan: premium template → 403 UPGRADE_REQUIRED; free template is watermarked', async () => {
+    const { agent } = await registerAgent(app);
+    const res = await create(agent, { templateId: await royalId() });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatchObject({ code: 'UPGRADE_REQUIRED', details: { reason: 'premium_template' } });
+    const ok = await create(agent);
+    expect(ok.status).toBe(202);
+    expect(ok.body.watermarked).toBe(true);
+  });
+
+  it('pro plan: premium template allowed, no watermark', async () => {
+    const { agent, user } = await registerAgent(app);
+    await setPlan(user.id, 'pro');
+    const res = await create(agent, { templateId: await royalId() });
+    expect(res.status).toBe(202);
+    expect(res.body.watermarked).toBe(false);
+  });
+
+  it('expired paid plan falls back to free', async () => {
+    const { agent, user } = await registerAgent(app);
+    await setPlan(user.id, 'ultra', -1);
+    expect((await create(agent, { templateId: await royalId() })).status).toBe(403);
+  });
+
+  it.each([['pro', 50], ['ultra', 100]] as const)('%s daily limit is %i', async (plan, limit) => {
+    const { agent, user } = await registerAgent(app);
+    await setPlan(user.id, plan);
+    const t = await TemplateModel.findById(victoryId);
+    await PosterModel.insertMany(Array.from({ length: limit - 1 }, () => ({ userId: user.id, templateId: t!._id, formData: sampleForm, photoIds: ['x'], status: 'completed' })));
+    expect((await create(agent)).status).toBe(202);
+    const res = await create(agent);
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('DAILY_LIMIT');
+  });
+
+  it('regenerating a premium-template poster after the plan lapses → 403', async () => {
+    const { agent, user } = await registerAgent(app);
+    await setPlan(user.id, 'pro');
+    const id = (await create(agent, { templateId: await royalId() })).body.id;
+    await PosterModel.updateOne({ _id: id }, { status: 'completed' });
+    await setPlan(user.id, 'pro', -1);
+    const res = await agent.post(`/api/posters/${id}/regenerate`).send({}).expect(403);
+    expect(res.body.error.code).toBe('UPGRADE_REQUIRED');
+  });
+});
+
+describe('POST /api/posters/:id/remove-watermark', () => {
+  it('free plan → 403 UPGRADE_REQUIRED (reason watermark)', async () => {
+    const { agent } = await registerAgent(app);
+    const id = await completedPoster(agent);
+    const res = await agent.post(`/api/posters/${id}/remove-watermark`).expect(403);
+    expect(res.body.error).toMatchObject({ code: 'UPGRADE_REQUIRED', details: { reason: 'watermark' } });
+  });
+
+  it('after upgrading: re-queues with the same design, free of regeneration cost', async () => {
+    const { agent, user } = await registerAgent(app);
+    const id = await completedPoster(agent);
+    await setPlan(user.id, 'pro');
+    queue.enqueued = [];
+    const res = await agent.post(`/api/posters/${id}/remove-watermark`).expect(202);
+    expect(res.body).toMatchObject({ status: 'queued', watermarked: false, regenerationsLeft: 3 });
+    expect(queue.enqueued).toEqual([id]);
+    expect((await PosterModel.findById(id))!.reuseDesign).toBe(true);
+    // Second call while queued → busy
+    await agent.post(`/api/posters/${id}/remove-watermark`).expect(409);
+  });
+
+  it('other users get 404', async () => {
+    const a = await registerAgent(app);
+    const b = await registerAgent(app);
+    const id = await completedPoster(a.agent);
+    await setPlan(b.user.id, 'pro');
+    await b.agent.post(`/api/posters/${id}/remove-watermark`).expect(404);
   });
 });

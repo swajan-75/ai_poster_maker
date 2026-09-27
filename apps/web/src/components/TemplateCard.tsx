@@ -3,8 +3,10 @@ import Link from 'next/link';
 import type { TemplateDTO } from '@poster/shared';
 import { useT } from '@/lib/i18n';
 import { useTilt } from '@/lib/use-tilt';
+import { CrownIcon } from './UpgradePrompt';
 
-export function TemplateCard({ t: template }: { t: TemplateDTO }) {
+/** `locked`: premium template shown to a free-plan user — the create page will ask them to upgrade. */
+export function TemplateCard({ t: template, locked = false }: { t: TemplateDTO; locked?: boolean }) {
   const t = useT();
   const tilt = useTilt<HTMLAnchorElement>();
   return (
@@ -17,6 +19,12 @@ export function TemplateCard({ t: template }: { t: TemplateDTO }) {
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-ink shadow-sm">
           {t.occasion[template.occasion]}
         </span>
+        {!template.isFree && (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-marigold px-2.5 py-1 text-[11px] font-bold text-ink shadow-sm">
+            <CrownIcon className="h-3 w-3" />{t.upgrade.premiumBadge}
+            {locked && <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+          </span>
+        )}
         <span aria-hidden="true"
           className="absolute bottom-3 right-3 grid h-11 w-11 translate-y-3 place-items-center rounded-full bg-marigold text-ink opacity-0 shadow-lg transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>

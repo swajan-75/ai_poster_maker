@@ -1,5 +1,5 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { USER_ROLES } from '@poster/shared';
+import { PLANS, USER_ROLES } from '@poster/shared';
 
 const userSchema = new Schema(
   {
@@ -8,6 +8,8 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: USER_ROLES, default: 'user', required: true },
     isBlocked: { type: Boolean, default: false, required: true },
+    plan: { type: String, enum: PLANS, default: 'free', required: true },
+    planExpiresAt: { type: Date },
   },
   { timestamps: true },
 );

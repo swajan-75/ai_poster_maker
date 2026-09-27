@@ -11,6 +11,8 @@ export interface RenderContext {
   form: PosterFormData;
   photos: RenderPhoto[];
   backgroundDataUri: string | null;
+  /** Free-plan posters carry a tiled watermark across the whole canvas. */
+  watermark?: boolean;
 }
 
 const LAYOUTS: Record<LayoutKey, (ctx: RenderContext) => string> = {

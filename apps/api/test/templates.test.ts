@@ -30,7 +30,9 @@ describe('templates', () => {
     const all = await request(app).get('/api/templates').expect(200);
     expect(all.body.items).toHaveLength(SEED_TEMPLATES.length - 1);
     const v = await request(app).get('/api/templates?occasion=victory_day').expect(200);
-    expect(v.body.items.map((t: { slug: string }) => t.slug)).toEqual(['victory-day-classic']);
+    expect(v.body.items.map((t: { slug: string }) => t.slug).sort()).toEqual(['victory-day-classic', 'victory-day-royal']);
+    const royal = v.body.items.find((t: { slug: string }) => t.slug === 'victory-day-royal');
+    expect(royal.isFree).toBe(false);
   });
 
   it('invalid occasion → 400', async () => {

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { OCCASIONS, type Occasion, type TemplateDTO } from '@poster/shared';
-import { useTemplates } from '@/lib/queries';
+import { useMe, useTemplates } from '@/lib/queries';
 import { TemplateCard } from '@/components/TemplateCard';
 import { errorMessage } from '@/lib/error-messages';
 import { formatNumber, useLocale, useT } from '@/lib/i18n';
@@ -42,6 +42,8 @@ export default function TemplatesPage() {
   const [locale] = useLocale();
   const [occasion, setOccasion] = useState<Occasion | undefined>();
   const { data, isLoading, error, refetch } = useTemplates(occasion);
+  const { data: me } = useMe({ optional: true });
+  const freePlan = !me || me.plan === 'free';
   const { data: all } = useTemplates(undefined);
 
   return (
@@ -89,7 +91,7 @@ export default function TemplatesPage() {
         )}
         {data && data.length > 0 && (
           <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-            {data.map((t, i) => <div key={t.id} className="rise" style={{ '--i': i } as React.CSSProperties}><TemplateCard t={t} /></div>)}
+            {data.map((t, i) => <div key={t.id} className="rise" style={{ '--i': i } as React.CSSProperties}><TemplateCard t={t} locked={freePlan && !t.isFree} /></div>)}
           </div>
         )}
       </section>

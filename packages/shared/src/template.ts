@@ -21,6 +21,8 @@ export interface TemplateDTO {
   thumbnailUrl: string;
   defaultHeadline: string;
   palettes: Palette[];
+  /** Premium templates (false) need a Pro or Ultra plan. */
+  isFree: boolean;
 }
 
 export interface AdminTemplateDTO extends TemplateDTO {
@@ -42,6 +44,7 @@ export const adminTemplateCreateSchema = z.object({
   palettes: z.array(paletteSchema).min(1),
   motifs: z.array(z.enum(MOTIFS)).min(1),
   defaultDesign: posterDesignSchema,
+  isFree: z.boolean().optional(),
 });
 export type AdminTemplateCreateInput = z.infer<typeof adminTemplateCreateSchema>;
 

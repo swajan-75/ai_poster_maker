@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { usePoster, useRegenerate } from '@/lib/queries';
+import { useMe, usePoster, useRegenerate, useRemoveWatermark } from '@/lib/queries';
+import { UpgradePrompt } from '@/components/UpgradePrompt';
 import { StatusBadge } from '@/components/StatusBadge';
 import { RegenerateForm } from '@/components/RegenerateForm';
 import { errorMessage } from '@/lib/error-messages';
@@ -13,6 +14,8 @@ export default function PosterPage() {
   const { id } = useParams<{ id: string }>();
   const poster = usePoster(id);
   const regen = useRegenerate(id);
+  const unmark = useRemoveWatermark(id);
+  const { data: me } = useMe({ optional: true });
 
   if (poster.isLoading) return <div className="skeleton mx-auto aspect-[3/4] max-w-md" />;
   if (poster.error) {
@@ -53,6 +56,21 @@ export default function PosterPage() {
                   {t.posterDetail.downloadPng}
                 </a>
                 <a href={p.downloadUrls.jpg} download className="btn btn-ghost px-5 py-3">{t.posterDetail.downloadJpg}</a>
+              </div>
+            )}
+            {p.watermarked && (
+              <div className="w-full max-w-md">
+                {me?.plan === 'free' ? (
+                  <UpgradePrompt compact title={t.upgrade.watermarkTitle} body={t.upgrade.watermarkBody} cta={t.upgrade.cta} />
+                ) : (
+                  <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+                    <p className="text-sm text-ink/65">{t.upgrade.watermarkedNote}</p>
+                    <button className="btn btn-primary px-4 py-2" disabled={unmark.isPending} onClick={() => unmark.mutate()}>
+                      {unmark.isPending ? t.upgrade.removing : t.upgrade.removeWatermark}
+                    </button>
+                  </div>
+                )}
+                {unmark.error && <p role="alert" className="pop mt-2 text-sm font-medium text-rally">{errorMessage(unmark.error)}</p>}
               </div>
             )}
           </>

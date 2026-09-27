@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import type { LoginInput, PublicUser, RegisterInput } from '@poster/shared';
 import { UserModel, type UserDoc } from '../../models/user.model.js';
 import { AppError, conflict } from '../../lib/errors.js';
+import { effectivePlan, planExpiry } from '../billing/subscription.service.js';
 
 const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
 
@@ -24,7 +25,10 @@ export async function authenticate(input: LoginInput): Promise<UserDoc> {
 }
 
 export function toPublicUser(u: UserDoc): PublicUser {
-  return { id: u._id.toString(), name: u.name, email: u.email, role: u.role };
+  return {
+    id: u._id.toString(), name: u.name, email: u.email, role: u.role,
+    plan: effectivePlan(u), planExpiresAt: planExpiry(u)?.toISOString() ?? null,
+  };
 }
 
 

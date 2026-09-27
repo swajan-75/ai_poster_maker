@@ -35,6 +35,7 @@ const templateSchema = new Schema(
     motifs: { type: [{ type: String, enum: MOTIFS }], validate: (v: unknown[]) => v.length > 0 },
     defaultDesign: { type: designSchema, required: true },
     isActive: { type: Boolean, default: true },
+    isFree: { type: Boolean, default: true, index: true },
   },
   { timestamps: true },
 );

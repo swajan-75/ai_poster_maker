@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import type { PosterFormData, TemplateDTO } from '@poster/shared';
-import { useCreatePoster, useTemplate } from '@/lib/queries';
+import { useCreatePoster, useMe, useTemplate } from '@/lib/queries';
+import { UpgradePrompt } from '@/components/UpgradePrompt';
 import { PosterForm, type PosterPreview } from '@/components/PosterForm';
 import { errorMessage } from '@/lib/error-messages';
 import { useT } from '@/lib/i18n';
@@ -49,6 +50,7 @@ export default function CreatePosterPage() {
   const router = useRouter();
   const template = useTemplate(templateId);
   const create = useCreatePoster();
+  const { data: me } = useMe({ optional: true });
   const [preview, setPreview] = useState<PosterPreview>();
   const templateIdOf = template.data?.id;
   const { mutate } = create;
@@ -61,6 +63,12 @@ export default function CreatePosterPage() {
   if (template.error || !template.data) return <p role="alert" className="card p-4 text-rally">{errorMessage(template.error)}</p>;
 
   const t = template.data;
+  const locked = !t.isFree && me?.plan === 'free';
+  const errCode = create.error?.code;
+  // Hitting a plan limit is an upsell moment, not just an error line (Ultra has nowhere to go).
+  const upsell = errCode === 'UPGRADE_REQUIRED' ? { title: tr.upgrade.premiumTitle, body: tr.upgrade.premiumBody }
+    : errCode === 'DAILY_LIMIT' && me?.plan !== 'ultra' ? { title: tr.upgrade.limitTitle, body: tr.upgrade.limitBody }
+    : null;
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -68,13 +76,15 @@ export default function CreatePosterPage() {
           <span className="transition-transform group-hover:-translate-x-1" aria-hidden="true">←</span>{tr.createPage.back}
         </Link>
         <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{tr.createPage.title}</h1>
-        <p className="text-ink/55">{t.title}</p>
+        <p className="flex items-center gap-2 text-ink/55">{t.title}{!t.isFree && <span className="rounded-full bg-marigold px-2 py-0.5 text-[11px] font-bold text-ink">{tr.upgrade.premiumBadge}</span>}</p>
       </div>
       <div className="grid items-start gap-8 md:grid-cols-[1fr_340px]">
         <div className="md:order-2 md:sticky md:top-24">
           <div className="mx-auto max-w-[260px] md:max-w-none"><LivePreview template={t} preview={preview} /></div>
         </div>
-        <div className="md:order-1">
+        <div className="flex flex-col gap-4 md:order-1">
+          {locked ? <UpgradePrompt title={tr.upgrade.premiumTitle} body={tr.upgrade.premiumBody} cta={tr.upgrade.cta} /> : <>
+          {upsell && <UpgradePrompt compact title={upsell.title} body={upsell.body} cta={tr.upgrade.cta} />}
           <PosterForm
             template={t}
             submitting={create.isPending}
@@ -82,6 +92,7 @@ export default function CreatePosterPage() {
             onPreviewChange={setPreview}
             onSubmit={onSubmit}
           />
+          </>}
         </div>
       </div>
     </section>

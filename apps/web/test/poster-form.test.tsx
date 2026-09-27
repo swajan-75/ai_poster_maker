@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { TemplateDTO } from '@poster/shared';
 import { PosterForm } from '@/components/PosterForm';
 
-const template: TemplateDTO = { id: 't1', slug: 'v', title: 'মহান বিজয় দিবস', occasion: 'victory_day', layoutKey: 'victory', photoSlots: 3, thumbnailUrl: '/x.png', defaultHeadline: 'মহান বিজয় দিবস', palettes: [] };
+const template: TemplateDTO = { id: 't1', slug: 'v', title: 'মহান বিজয় দিবস', occasion: 'victory_day', layoutKey: 'victory', photoSlots: 3, thumbnailUrl: '/x.png', defaultHeadline: 'মহান বিজয় দিবস', palettes: [], isFree: true };
 const upload = vi.fn(async () => ({ publicId: 'p1', url: 'data:image/png;base64,AA==', width: 600, height: 800 }));
 
 describe('PosterForm', () => {

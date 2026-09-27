@@ -15,6 +15,7 @@ import { uploadsRouter } from '../modules/uploads/uploads.routes.js';
 import { postersRouter } from '../modules/posters/posters.routes.js';
 import { filesRouter } from '../modules/files/files.routes.js';
 import { adminRouter } from '../modules/admin/admin.routes.js';
+import { billingRouter } from '../modules/billing/billing.routes.js';
 
 export function createApp(deps: AppDeps, extend?: (router: Router) => void) {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp(deps: AppDeps, extend?: (router: Router) => void) {
   api.use('/templates', templatesRouter());
   api.use('/upload', uploadsRouter(deps));
   api.use('/posters', postersRouter(deps));
+  api.use('/billing', billingRouter(deps));
   api.use('/admin', adminRouter(deps));
   if (deps.env.STORAGE_MODE !== 'cloudinary') api.use('/files', filesRouter(deps));
   extend?.(api);

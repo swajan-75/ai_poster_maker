@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLogout, useMe } from '@/lib/queries';
 import { useLocale, useT } from '@/lib/i18n';
+import { PlanBadge } from './PlanBadge';
 
 export function LogoMark({ className = 'h-9 w-9' }: { className?: string }) {
   return (
@@ -48,6 +49,7 @@ export function Header() {
         <div className="flex items-center gap-1">
           <NavLink href="/templates">{t.common.templates}</NavLink>
           {user && <NavLink href="/history">{t.common.myPosters}</NavLink>}
+          <NavLink href="/pricing">{t.common.pricing}</NavLink>
           {user?.role === 'admin' && <NavLink href="/admin">{t.common.admin}</NavLink>}
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -68,6 +70,7 @@ export function Header() {
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-soft font-bold text-brand" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</span>
                 {user.name}
               </span>
+              <Link href="/pricing" aria-label={t.common.pricing}><PlanBadge plan={user.plan} /></Link>
               <button
                 className="btn btn-ghost px-3 py-1.5"
                 onClick={() => logout.mutate(undefined, { onSuccess: () => router.push('/login') })}

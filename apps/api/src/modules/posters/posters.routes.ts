@@ -7,7 +7,7 @@ import { generationLimiter } from '../../http/middleware/rate-limit.js';
 import { validateBody, validateQuery } from '../../http/middleware/validate.js';
 import { forbidden, notFound } from '../../lib/errors.js';
 import { toPosterDTO } from './poster.mapper.js';
-import { createPoster, deletePoster, getPosterForUser, listPosters, regeneratePoster } from './posters.service.js';
+import { createPoster, deletePoster, getPosterForUser, listPosters, regeneratePoster, removeWatermark } from './posters.service.js';
 
 const pageQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -21,7 +21,7 @@ export function postersRouter(deps: AppDeps): Router {
   r.use(requireAuth(env));
 
   r.post('/', gen, validateBody(createPosterSchema), async (req, res) => {
-    const p = await createPoster(req.user!, req.body, { queue, env });
+    const p = await createPoster(req.user!, req.body, { queue });
     res.status(202).json(toPosterDTO(p, storage));
   });
 
@@ -47,6 +47,11 @@ export function postersRouter(deps: AppDeps): Router {
 
   r.post('/:id/regenerate', gen, validateBody(regenerateSchema), async (req, res) => {
     const p = await regeneratePoster(String(req.params.id), req.user!, req.body, { queue });
+    res.status(202).json(toPosterDTO(p, storage));
+  });
+
+  r.post('/:id/remove-watermark', async (req, res) => {
+    const p = await removeWatermark(String(req.params.id), req.user!, { queue });
     res.status(202).json(toPosterDTO(p, storage));
   });
 
