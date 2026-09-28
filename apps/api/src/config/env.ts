@@ -11,6 +11,8 @@ const schema = z
     AI_MODE: z.enum(['gemini', 'fake']).default('gemini'),
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_TEXT_MODEL: z.string().default('gemini-3.5-flash'),
+    // Used by moderation when GEMINI_TEXT_MODEL is overloaded or failing; empty disables the fallback.
+    GEMINI_MODERATION_FALLBACK_MODEL: z.string().default('gemini-3.5-flash-lite'),
     GEMINI_IMAGE_MODEL: z.string().default('gemini-2.5-flash-image'),
     STORAGE_MODE: z.enum(['cloudinary', 'memory']).default('cloudinary'),
     CLOUDINARY_CLOUD_NAME: z.string().optional(),

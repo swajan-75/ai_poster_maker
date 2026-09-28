@@ -33,7 +33,8 @@ function assertTemplateAllowed(template: { isFree: boolean }, plan: Plan): void 
     throw upgradeRequired('premium_template', 'This template needs a Pro or Ultra plan');
 }
 
-const MODERATION_TIMEOUT_MS = 15_000;
+// Covers a retry on the main model plus the fallback model, which can be slow under load.
+const MODERATION_TIMEOUT_MS = 30_000;
 
 export interface ModerationDeps { moderator: ModerationProvider; logger: Logger }
 

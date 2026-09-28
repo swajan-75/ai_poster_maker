@@ -33,7 +33,7 @@ export function buildRuntime(env: Env, logger: Logger, o: Overrides = {}): Runti
   const genai = env.AI_MODE === 'gemini' ? new GoogleGenAI({ apiKey: env.GEMINI_API_KEY! }) : null;
   const designProvider = o.designProvider ?? (genai ? new GeminiDesignProvider(genai, env.GEMINI_TEXT_MODEL) : new FakeDesignProvider());
   const backgroundProvider = o.backgroundProvider ?? (genai ? new GeminiBackgroundProvider(genai, env.GEMINI_IMAGE_MODEL) : new FakeBackgroundProvider());
-  const moderator = o.moderator ?? (genai ? new GeminiModerationProvider(genai, env.GEMINI_TEXT_MODEL) : new FakeModerationProvider());
+  const moderator = o.moderator ?? (genai ? new GeminiModerationProvider(genai, [env.GEMINI_TEXT_MODEL, env.GEMINI_MODERATION_FALLBACK_MODEL].filter(Boolean)) : new FakeModerationProvider());
   const renderer = o.renderer ?? new PuppeteerRenderer({ executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
   const backgrounds = createBackgroundService({ provider: backgroundProvider, storage, logger });
 

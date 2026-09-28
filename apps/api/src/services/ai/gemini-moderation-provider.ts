@@ -28,13 +28,44 @@ const RESPONSE_SCHEMA = {
   required: ['flagged', 'reason'],
 };
 
+const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
+const isTransient = (err: unknown) => TRANSIENT_STATUSES.has((err as { status?: unknown })?.status as number);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Tries each model in order. A transient error (overload, rate limit) gets one retry on the same
+ * model; any other failure moves straight to the next model. Throws the last error if all fail.
+ */
 export class GeminiModerationProvider implements ModerationProvider {
-  constructor(private readonly client: GenAiLike, private readonly model: string) {}
+  constructor(
+    private readonly client: GenAiLike,
+    private readonly models: string[],
+    private readonly retryDelayMs = 1000,
+  ) {
+    if (models.length === 0) throw new Error('GeminiModerationProvider needs at least one model');
+  }
 
   async review(input: ModerationInput): Promise<ModerationVerdict> {
+    const prompt = buildModerationPrompt(input);
+    let lastErr: unknown;
+    for (const model of this.models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          return await this.reviewWith(model, prompt);
+        } catch (err) {
+          lastErr = err;
+          if (!isTransient(err)) break;
+          if (attempt === 0) await sleep(this.retryDelayMs);
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  private async reviewWith(model: string, prompt: string): Promise<ModerationVerdict> {
     const res = await this.client.models.generateContent({
-      model: this.model,
-      contents: [{ role: 'user', parts: [{ text: buildModerationPrompt(input) }] }],
+      model,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0 },
     });
     if (!res.text) throw new Error('Gemini returned empty moderation response');
