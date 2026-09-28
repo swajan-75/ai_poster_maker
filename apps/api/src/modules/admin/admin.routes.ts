@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { adminTemplateCreateSchema, adminTemplateUpdateSchema, objectIdSchema, POSTER_STATUSES } from '@poster/shared';
+import { adminTemplateCreateSchema, adminTemplateUpdateSchema, objectIdSchema, POSTER_STATUSES, rejectPosterSchema, type RejectPosterInput } from '@poster/shared';
 import type { AppDeps } from '../../runtime-types.js';
 import { requireAuth, requireRole } from '../../http/middleware/auth.js';
 import { validateBody, validateQuery } from '../../http/middleware/validate.js';
 import { notFound } from '../../lib/errors.js';
+import { toPosterDTO } from '../posters/poster.mapper.js';
 import {
-  createTemplate, deactivateTemplate, listAllPosters, listAllTemplates, listUsers,
-  setUserBlocked, toAdminTemplateDTO, updateTemplate,
+  approvePoster, createTemplate, deactivateTemplate, listAllPosters, listAllTemplates, listModerationQueue, listUsers,
+  rejectPoster, setUserBlocked, toAdminTemplateDTO, updateTemplate,
 } from './admin.service.js';
 import { getAnalytics } from './analytics.service.js';
 
@@ -20,7 +21,7 @@ const userQuery = pageQuery.extend({ blocked: z.coerce.boolean().optional() });
 const idParam = objectIdSchema;
 
 export function adminRouter(deps: AppDeps): Router {
-  const { env, storage } = deps;
+  const { env, storage, queue } = deps;
   const r = Router();
   r.use(requireAuth(env), requireRole('admin'));
 
@@ -52,11 +53,32 @@ export function adminRouter(deps: AppDeps): Router {
     res.status(204).end();
   });
 
-  // --- Moderation queue ---
+  // --- All posters ---
   r.get('/posters', validateQuery(posterQuery), async (req, res) => {
     const q = res.locals.query as z.infer<typeof posterQuery>;
     const { items, total } = await listAllPosters(q.page, q.limit, q.status, storage);
     res.json({ items, total, page: q.page, limit: q.limit });
+  });
+
+  // --- Moderation queue: posters whose text was flagged, waiting for a decision ---
+  r.get('/moderation', validateQuery(pageQuery), async (req, res) => {
+    const q = res.locals.query as z.infer<typeof pageQuery>;
+    res.set('Cache-Control', 'no-store');
+    const { items, total } = await listModerationQueue(q.page, q.limit, storage);
+    res.json({ items, total, page: q.page, limit: q.limit });
+  });
+
+  r.post('/moderation/:id/approve', async (req, res) => {
+    const id = String(req.params.id);
+    if (!idParam.safeParse(id).success) throw notFound('Poster not found');
+    res.json(toPosterDTO(await approvePoster(id, req.user!.id, queue), storage));
+  });
+
+  r.post('/moderation/:id/reject', validateBody(rejectPosterSchema), async (req, res) => {
+    const id = String(req.params.id);
+    if (!idParam.safeParse(id).success) throw notFound('Poster not found');
+    const { note } = req.body as RejectPosterInput;
+    res.json(toPosterDTO(await rejectPoster(id, req.user!.id, note || undefined), storage));
   });
 
   // --- Users ---

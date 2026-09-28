@@ -9,7 +9,8 @@ export const OCCASION_LABELS_BN: Record<Occasion, string> = {
   festival: 'ঈদ/উৎসব',
 };
 
-export const POSTER_STATUSES = ['queued', 'generating', 'completed', 'failed'] as const;
+// pending_review: flagged by moderation, waiting for an admin. rejected: an admin refused it (terminal).
+export const POSTER_STATUSES = ['pending_review', 'queued', 'generating', 'completed', 'failed', 'rejected'] as const;
 export type PosterStatus = (typeof POSTER_STATUSES)[number];
 
 export const MOTIFS = ['paddy_field', 'flag_waves', 'doves', 'sunrise', 'floral', 'boat_river'] as const;

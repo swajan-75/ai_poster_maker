@@ -19,6 +19,7 @@ export function toPosterDTO(p: PosterDoc, storage: StorageService): PosterDTO {
     regenerationsLeft: Math.max(0, MAX_REGENERATIONS - p.regenerateCount),
     watermarked: p.watermarked,
     error: p.error ?? null,
+    rejectionNote: p.status === 'rejected' ? (p.moderation?.note ?? null) : null,
     createdAt: p.createdAt.toISOString(),
   };
 }

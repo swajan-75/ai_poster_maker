@@ -8,7 +8,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 const poster = (status: PosterDTO['status']): PosterDTO => ({
   id: 'p1', templateId: 't', status, imageUrl: status === 'completed' ? 'x' : null, downloadUrls: null,
-  regenerationsLeft: 3, watermarked: false, size: 'portrait', error: null, createdAt: '2026-09-25T10:00:00.000Z',
+  regenerationsLeft: 3, watermarked: false, size: 'portrait', error: null, rejectionNote: null, createdAt: '2026-09-25T10:00:00.000Z',
   formData: { name: '', designation: '', organization: '', union: '', thana: '', district: '', headline: 'h', tagline: '' },
 });
 

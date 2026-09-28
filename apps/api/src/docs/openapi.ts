@@ -177,7 +177,7 @@ export const openapiSpec = {
           id: { type: 'string' },
           templateId: { type: 'string' },
           formData: { $ref: '#/components/schemas/PosterFormData' },
-          status: { type: 'string', enum: ['queued', 'generating', 'completed', 'failed'] },
+          status: { type: 'string', enum: ['pending_review', 'queued', 'generating', 'completed', 'failed', 'rejected'] },
           imageUrl: { type: 'string', nullable: true },
           downloadUrls: {
             nullable: true,
@@ -186,6 +186,7 @@ export const openapiSpec = {
           },
           regenerationsLeft: { type: 'integer' },
           error: { type: 'string', nullable: true },
+          rejectionNote: { type: 'string', nullable: true, description: "Admin's note when status is rejected" },
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
@@ -210,6 +211,30 @@ export const openapiSpec = {
         required: ['items', 'total', 'page', 'limit'],
         properties: {
           items: { type: 'array', items: { $ref: '#/components/schemas/AdminPosterDTO' } },
+          total: { type: 'integer' },
+          page: { type: 'integer' },
+          limit: { type: 'integer' },
+        },
+      },
+      ModerationItemDTO: {
+        allOf: [
+          { $ref: '#/components/schemas/AdminPosterDTO' },
+          {
+            type: 'object',
+            required: ['flagReason', 'flaggedAt', 'photoUrls'],
+            properties: {
+              flagReason: { type: 'string' },
+              flaggedAt: { type: 'string', format: 'date-time' },
+              photoUrls: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        ],
+      },
+      ModerationListDTO: {
+        type: 'object',
+        required: ['items', 'total', 'page', 'limit'],
+        properties: {
+          items: { type: 'array', items: { $ref: '#/components/schemas/ModerationItemDTO' } },
           total: { type: 'integer' },
           page: { type: 'integer' },
           limit: { type: 'integer' },
@@ -550,18 +575,65 @@ export const openapiSpec = {
     },
     '/api/admin/posters': {
       get: {
-        summary: 'List posters across all users (moderation queue)',
+        summary: 'List posters across all users',
         tags: ['Admin'],
         security: [{ cookieAuth: [] }],
         parameters: [
           { $ref: '#/components/parameters/Page' },
           { $ref: '#/components/parameters/Limit' },
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['queued', 'generating', 'completed', 'failed'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending_review', 'queued', 'generating', 'completed', 'failed', 'rejected'] } },
         ],
         responses: {
           '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/AdminPosterListDTO' } } } },
           '401': { $ref: '#/components/responses/Unauthorized' },
           '403': { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/api/admin/moderation': {
+      get: {
+        summary: 'Moderation queue: posters flagged for review (status pending_review), oldest first',
+        tags: ['Admin'],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }],
+        responses: {
+          '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ModerationListDTO' } } } },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '403': { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/api/admin/moderation/{id}/approve': {
+      post: {
+        summary: 'Approve a flagged poster and send it to generation',
+        tags: ['Admin'],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Approved — poster queued', content: { 'application/json': { schema: { $ref: '#/components/schemas/PosterDTO' } } } },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '403': { $ref: '#/components/responses/Forbidden' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'POSTER_NOT_PENDING — already decided' },
+        },
+      },
+    },
+    '/api/admin/moderation/{id}/reject': {
+      post: {
+        summary: 'Reject a flagged poster; it will never be generated',
+        tags: ['Admin'],
+        security: [{ cookieAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: { 'application/json': { schema: { type: 'object', properties: { note: { type: 'string', maxLength: 300, description: 'Shown to the user' } } } } },
+        },
+        responses: {
+          '200': { description: 'Rejected', content: { 'application/json': { schema: { $ref: '#/components/schemas/PosterDTO' } } } },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '403': { $ref: '#/components/responses/Forbidden' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'POSTER_NOT_PENDING — already decided' },
         },
       },
     },

@@ -17,13 +17,13 @@ const pageQuery = z.object({
 });
 
 export function postersRouter(deps: AppDeps): Router {
-  const { env, storage, queue, renderer } = deps;
+  const { env, storage, queue, renderer, moderator, logger } = deps;
   const r = Router();
   const gen = generationLimiter(env.GENERATION_RATE_LIMIT);
   r.use(requireAuth(env));
 
   r.post('/', gen, validateBody(createPosterSchema), async (req, res) => {
-    const p = await createPoster(req.user!, req.body, { queue });
+    const p = await createPoster(req.user!, req.body, { queue, moderator, logger });
     res.status(202).json(toPosterDTO(p, storage));
   });
 
@@ -48,7 +48,7 @@ export function postersRouter(deps: AppDeps): Router {
   });
 
   r.post('/:id/regenerate', gen, validateBody(regenerateSchema), async (req, res) => {
-    const p = await regeneratePoster(String(req.params.id), req.user!, req.body, { queue });
+    const p = await regeneratePoster(String(req.params.id), req.user!, req.body, { queue, moderator, logger });
     res.status(202).json(toPosterDTO(p, storage));
   });
 

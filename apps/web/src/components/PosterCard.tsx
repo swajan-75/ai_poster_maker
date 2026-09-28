@@ -14,7 +14,7 @@ export function PosterCard({ poster: p, onDelete, deleting }: { poster: PosterDT
           {p.imageUrl
             // Grid cells stay 3:4; other sizes are shown whole (contain) rather than cropped.
             ? <img src={p.imageUrl} alt="" className={`aspect-[3/4] w-full transition-transform duration-700 group-hover:scale-[1.05] ${p.size === 'portrait' ? 'object-cover' : 'bg-ink/5 object-contain'}`} loading="lazy" decoding="async" />
-            : <div className={`flex aspect-[3/4] items-center justify-center ${p.status === 'failed' ? 'bg-rally/5' : 'skeleton rounded-none'}`}><StatusBadge status={p.status} /></div>}
+            : <div className={`flex aspect-[3/4] items-center justify-center ${p.status === 'failed' || p.status === 'rejected' ? 'bg-rally/5' : p.status === 'pending_review' ? 'bg-violet-50' : 'skeleton rounded-none'}`}><StatusBadge status={p.status} /></div>}
           {p.imageUrl && <span className="absolute left-2.5 top-2.5"><StatusBadge status={p.status} /></span>}
         </div>
         <div className="p-3.5">

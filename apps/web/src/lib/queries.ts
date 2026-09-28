@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AdminAnalyticsDTO, AdminPosterListDTO, AdminTemplateCreateInput, AdminTemplateDTO, AdminTemplateUpdateInput, AdminUserListDTO,
-  AuthResponse, BkashExecuteInput, CreatePosterInput, ExecutePaymentResponse, LoginInput, Occasion, PaidPlan, PaymentDTO,
+  AuthResponse, BkashExecuteInput, CreatePosterInput, ExecutePaymentResponse, LoginInput, ModerationListDTO, Occasion, PaidPlan, PaymentDTO,
   PosterDTO, PosterListDTO, PosterStatus, PublicUser, RegenerateInput, RegisterInput, SubscriptionDTO, TemplateDTO,
   UploadedPhotoDTO,
 } from '@poster/shared';
@@ -20,6 +20,7 @@ export const qk = {
   adminTemplates: ['adminTemplates'] as const,
   adminAnalytics: ['adminAnalytics'] as const,
   adminPosters: (page: number, status?: PosterStatus) => ['adminPosters', page, status ?? 'all'] as const,
+  moderation: (page: number) => ['moderation', page] as const,
   adminUsers: (page: number, blocked?: boolean) => ['adminUsers', page, blocked ?? 'all'] as const,
 };
 
@@ -100,7 +101,11 @@ export function usePoster(id: string) {
     queryKey: qk.poster(id),
     queryFn: () => apiFetch<PosterDTO>(`/posters/${id}`),
     staleTime: 0,
-    refetchInterval: (q) => (q.state.data && ACTIVE.has(q.state.data.status) ? 2000 : false),
+    // A human decides pending_review posters, so check back slowly rather than every 2s.
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      return status && ACTIVE.has(status) ? 2000 : status === 'pending_review' ? 15_000 : false;
+    },
   });
 }
 
@@ -232,6 +237,25 @@ export function useAdminDeletePoster(page: number, status?: PosterStatus) {
   return useMutation<void, ApiError, string>({
     mutationFn: (id) => apiFetch<void>(`/posters/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminPosters(page, status) }),
+  });
+}
+
+export function useModerationQueue(page: number) {
+  return useQuery({
+    queryKey: qk.moderation(page),
+    queryFn: () => apiFetch<ModerationListDTO>(`/admin/moderation?page=${page}&limit=20`),
+  });
+}
+
+export function useModerationDecision() {
+  const qc = useQueryClient();
+  return useMutation<PosterDTO, ApiError, { id: string; decision: 'approve' | 'reject'; note?: string }>({
+    mutationFn: ({ id, decision, note }) =>
+      apiFetch<PosterDTO>(`/admin/moderation/${id}/${decision}`, { method: 'POST', json: decision === 'reject' ? { note } : undefined }),
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: ['moderation'] }),
+      qc.invalidateQueries({ queryKey: ['adminPosters'] }),
+    ]),
   });
 }
 

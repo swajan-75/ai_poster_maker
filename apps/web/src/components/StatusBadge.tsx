@@ -2,8 +2,14 @@
 import type { PosterStatus } from '@poster/shared';
 import { useT } from '@/lib/i18n';
 
-const COLOR: Record<PosterStatus, string> = { queued: 'bg-amber-100 text-amber-900', generating: 'bg-sky-100 text-sky-900', completed: 'bg-brand-soft text-brand-strong', failed: 'bg-rally/10 text-rally' };
-const DOT: Record<PosterStatus, string> = { queued: 'bg-amber-500', generating: 'bg-sky-500 animate-pulse', completed: 'bg-brand', failed: 'bg-rally' };
+const COLOR: Record<PosterStatus, string> = {
+  pending_review: 'bg-violet-100 text-violet-900', queued: 'bg-amber-100 text-amber-900', generating: 'bg-sky-100 text-sky-900',
+  completed: 'bg-brand-soft text-brand-strong', failed: 'bg-rally/10 text-rally', rejected: 'bg-rally/10 text-rally',
+};
+const DOT: Record<PosterStatus, string> = {
+  pending_review: 'bg-violet-500', queued: 'bg-amber-500', generating: 'bg-sky-500 animate-pulse',
+  completed: 'bg-brand', failed: 'bg-rally', rejected: 'bg-rally',
+};
 
 export function StatusBadge({ status }: { status: PosterStatus }) {
   const t = useT();

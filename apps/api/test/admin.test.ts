@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { useTestDb } from './setup-db.js';
 import { createApp } from '../src/http/app.js';
-import { makeTestDeps, registerAgent } from './helpers.js';
+import { FakeQueue, makeTestDeps, registerAgent } from './helpers.js';
 import { seedTemplates, SEED_TEMPLATES } from '../scripts/seed-data.js';
 import { TemplateModel } from '../src/models/template.model.js';
 import { UserModel } from '../src/models/user.model.js';
@@ -76,7 +76,79 @@ describe('admin: templates', () => {
 });
 
 describe('admin: moderation queue', () => {
-  it('lists posters across all users with owner info and status filter', async () => {
+  const queue = new FakeQueue();
+  const modApp = createApp(makeTestDeps({ queue }));
+
+  async function flaggedPoster(ownerId: string, flaggedAt = new Date()) {
+    await seedTemplates();
+    const template = await TemplateModel.findOne({ slug: SEED_TEMPLATES[0]!.slug });
+    return PosterModel.create({
+      userId: ownerId, templateId: template!._id, formData: { name: 'ক', designation: 'খ', organization: 'গ', district: 'ঘ', headline: 'ঙ' },
+      photoIds: ['x'], status: 'pending_review', moderation: { flagReason: 'Blocked term: "kill"', flaggedAt },
+    });
+  }
+  async function modAdmin() {
+    const a = await registerAgent(modApp);
+    await UserModel.updateOne({ _id: a.user.id }, { role: 'admin' });
+    await a.agent.post('/api/auth/login').send({ email: a.user.email, password: 'password123' }).expect(200);
+    return a;
+  }
+
+  it('non-admins cannot see or act on the queue', async () => {
+    const u = await registerAgent(modApp);
+    const p = await flaggedPoster(u.user.id);
+    await u.agent.get('/api/admin/moderation').expect(403);
+    await u.agent.post(`/api/admin/moderation/${p.id}/approve`).expect(403);
+    await u.agent.post(`/api/admin/moderation/${p.id}/reject`).send({}).expect(403);
+  });
+
+  it('GET /moderation lists only pending_review posters, oldest first, with reason and photos', async () => {
+    const admin = await modAdmin();
+    const owner = await registerAgent(modApp);
+    const older = await flaggedPoster(owner.user.id);
+    const newer = await flaggedPoster(owner.user.id);
+    await PosterModel.create({ userId: owner.user.id, templateId: newer.templateId, formData: newer.formData, photoIds: ['x'], status: 'completed' });
+
+    const res = await admin.agent.get('/api/admin/moderation').expect(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.items.map((i: { id: string }) => i.id)).toEqual([older.id, newer.id]);
+    expect(res.body.items[0]).toMatchObject({ status: 'pending_review', ownerEmail: owner.user.email, flagReason: 'Blocked term: "kill"' });
+    expect(res.body.items[0].photoUrls).toHaveLength(1);
+  });
+
+  it('approve → queued and enqueued; deciding twice → 409', async () => {
+    const admin = await modAdmin();
+    const p = await flaggedPoster(admin.user.id);
+    queue.enqueued = [];
+    const res = await admin.agent.post(`/api/admin/moderation/${p.id}/approve`).expect(200);
+    expect(res.body.status).toBe('queued');
+    expect(queue.enqueued).toEqual([p.id]);
+    const stored = (await PosterModel.findById(p.id))!;
+    expect(stored.moderation).toMatchObject({ decision: 'approved', flagReason: 'Blocked term: "kill"' });
+    expect(stored.moderation!.reviewedBy!.toString()).toBe(admin.user.id);
+
+    const again = await admin.agent.post(`/api/admin/moderation/${p.id}/reject`).send({}).expect(409);
+    expect(again.body.error.code).toBe('POSTER_NOT_PENDING');
+  });
+
+  it('reject → rejected with the note visible to the owner; never enqueued', async () => {
+    const admin = await modAdmin();
+    const owner = await registerAgent(modApp);
+    const p = await flaggedPoster(owner.user.id);
+    queue.enqueued = [];
+    await admin.agent.post(`/api/admin/moderation/${p.id}/reject`).send({ note: 'Hate speech' }).expect(200);
+    expect(queue.enqueued).toEqual([]);
+    const mine = await owner.agent.get(`/api/posters/${p.id}`).expect(200);
+    expect(mine.body).toMatchObject({ status: 'rejected', rejectionNote: 'Hate speech', imageUrl: null });
+  });
+
+  it('unknown id → 404', async () => {
+    const admin = await modAdmin();
+    await admin.agent.post('/api/admin/moderation/64b000000000000000000000/approve').expect(404);
+    await admin.agent.post('/api/admin/moderation/not-an-id/reject').send({}).expect(404);
+  });
+
+  it('GET /posters lists posters across all users with owner info and status filter', async () => {
     const admin = await makeAdmin();
     await seedTemplates();
     const template = await TemplateModel.findOne({ slug: SEED_TEMPLATES[0]!.slug });
@@ -154,7 +226,7 @@ describe('admin: analytics', () => {
     const { body } = await admin.agent.get('/api/admin/analytics').expect(200);
     expect(body.users).toMatchObject({ total: 2, newLast7d: 2, blocked: 0, byPlan: { free: 1, pro: 1, ultra: 0 } });
     expect(body.posters).toMatchObject({ createdTotal: 4, createdLast24h: 4, createdLast7d: 4, failureRate: 0.5 });
-    expect(body.posters.byStatus).toEqual({ queued: 0, generating: 0, completed: 1, failed: 1 });
+    expect(body.posters.byStatus).toEqual({ pending_review: 0, queued: 0, generating: 0, completed: 1, failed: 1, rejected: 0 });
     expect(body.revenue).toMatchObject({ totalBdt: 548, last30dBdt: 548, paidCount: 2 });
     expect(body.revenue.paymentsByStatus).toMatchObject({ completed: 2, cancelled: 1, pending: 0 });
     expect(body.revenue.paidByPlan).toEqual({ pro: { count: 1, amountBdt: 199 }, ultra: { count: 1, amountBdt: 349 } });

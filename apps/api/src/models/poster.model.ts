@@ -9,6 +9,18 @@ const formSchema = new Schema(
   { _id: false },
 );
 
+const moderationSchema = new Schema(
+  {
+    flagReason: { type: String, required: true },
+    flaggedAt: { type: Date, required: true },
+    decision: { type: String, enum: ['approved', 'rejected'] },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: Date,
+    note: String,
+  },
+  { _id: false },
+);
+
 const posterSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -24,6 +36,8 @@ const posterSchema = new Schema(
     watermarked: { type: Boolean, default: false, required: true },
     // Set by remove-watermark: re-render with the stored design instead of asking the AI again.
     reuseDesign: { type: Boolean, default: false },
+    // Present only when the text was flagged for human review.
+    moderation: { type: moderationSchema, required: false },
     error: String,
   },
   { timestamps: true },

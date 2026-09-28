@@ -1,11 +1,12 @@
 import { isValidObjectId } from 'mongoose';
 import type {
   AdminPosterDTO, AdminTemplateCreateInput, AdminTemplateDTO, AdminTemplateUpdateInput,
-  AdminUserDTO, PosterStatus,
+  AdminUserDTO, ModerationItemDTO, PosterStatus,
 } from '@poster/shared';
 import { conflict, forbidden, notFound } from '../../lib/errors.js';
+import type { PosterQueue } from '../../jobs/job-queue.js';
 import { TemplateModel, type TemplateDoc } from '../../models/template.model.js';
-import { PosterModel } from '../../models/poster.model.js';
+import { PosterModel, type PosterDoc } from '../../models/poster.model.js';
 import { UserModel, type UserDoc } from '../../models/user.model.js';
 import type { StorageService } from '../../services/storage/storage.js';
 import { toPosterDTO } from '../posters/poster.mapper.js';
@@ -71,13 +72,59 @@ export async function listAllPosters(
     PosterModel.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit),
     PosterModel.countDocuments(filter),
   ]);
+  return { items: await withOwners(rows, storage), total };
+}
+
+async function withOwners(rows: PosterDoc[], storage: StorageService): Promise<AdminPosterDTO[]> {
   const owners = await UserModel.find({ _id: { $in: [...new Set(rows.map((p) => p.userId.toString()))] } }, 'name email');
   const byId = new Map(owners.map((u) => [u._id.toString(), u]));
-  const items = rows.map((p) => {
+  return rows.map((p) => {
     const owner = byId.get(p.userId.toString());
     return { ...toPosterDTO(p, storage), ownerName: owner?.name ?? '', ownerEmail: owner?.email ?? '' };
   });
+}
+
+/** Posters held for review, oldest first so nobody waits at the back of the queue. */
+export async function listModerationQueue(
+  page: number, limit: number, storage: StorageService,
+): Promise<{ items: ModerationItemDTO[]; total: number }> {
+  const filter = { status: 'pending_review' as const };
+  const [rows, total] = await Promise.all([
+    PosterModel.find(filter).sort({ createdAt: 1, _id: 1 }).skip((page - 1) * limit).limit(limit),
+    PosterModel.countDocuments(filter),
+  ]);
+  const base = await withOwners(rows, storage);
+  const items = rows.map((p, i) => ({
+    ...base[i]!,
+    flagReason: p.moderation?.flagReason ?? '',
+    flaggedAt: (p.moderation?.flaggedAt ?? p.createdAt).toISOString(),
+    photoUrls: p.photoIds.map((id) => storage.getUrl(id, { format: 'jpg', width: 400 })),
+  }));
   return { items, total };
+}
+
+async function decide(id: string, adminId: string, decision: 'approved' | 'rejected', extra: Record<string, unknown>): Promise<PosterDoc> {
+  if (!isValidObjectId(id)) throw notFound('Poster not found');
+  const updated = await PosterModel.findOneAndUpdate(
+    { _id: id, status: 'pending_review' },
+    { $set: { 'moderation.decision': decision, 'moderation.reviewedBy': adminId, 'moderation.reviewedAt': new Date(), ...extra } },
+    { new: true },
+  );
+  if (updated) return updated;
+  if (!(await PosterModel.exists({ _id: id }))) throw notFound('Poster not found');
+  throw conflict('POSTER_NOT_PENDING', 'Poster is not waiting for review');
+}
+
+/** Releases a held poster into the generation queue. */
+export async function approvePoster(id: string, adminId: string, queue: PosterQueue): Promise<PosterDoc> {
+  const p = await decide(id, adminId, 'approved', { status: 'queued' });
+  queue.enqueue(p.id);
+  return p;
+}
+
+/** Refuses a held poster for good. Its quota slot is not given back. */
+export function rejectPoster(id: string, adminId: string, note: string | undefined): Promise<PosterDoc> {
+  return decide(id, adminId, 'rejected', { status: 'rejected', ...(note ? { 'moderation.note': note } : {}) });
 }
 
 export async function listUsers(page: number, limit: number, blocked?: boolean): Promise<{ items: AdminUserDTO[]; total: number }> {

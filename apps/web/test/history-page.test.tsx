@@ -9,7 +9,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const poster = (n: number): PosterDTO => ({
   id: `p${n}`, templateId: 't', status: 'completed', imageUrl: 'data:image/png;base64,AA==', downloadUrls: { png: '/png', jpg: '/jpg' },
-  regenerationsLeft: 3, watermarked: false, size: 'portrait', error: null, createdAt: '2026-09-25T10:00:00.000Z',
+  regenerationsLeft: 3, watermarked: false, size: 'portrait', error: null, rejectionNote: null, createdAt: '2026-09-25T10:00:00.000Z',
   formData: { name: 'করিম', designation: 'সভাপতি', organization: 'কমিটি', union: '', thana: '', district: 'ঢাকা', headline: `poster-${n}`, tagline: '' },
 });
 

@@ -94,6 +94,21 @@ export default function PosterPage() {
             )}
           </>
         )}
+        {p.status === 'pending_review' && (
+          <div role="status" className="card flex w-full max-w-md flex-col items-center gap-3 p-8 text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-full bg-violet-100 text-2xl text-violet-700" aria-hidden="true">⏳</span>
+            <h2 className="font-display text-lg font-bold">{t.posterDetail.underReviewTitle}</h2>
+            <p className="text-ink/75">{t.posterDetail.underReviewMessage}</p>
+          </div>
+        )}
+        {p.status === 'rejected' && (
+          <div role="alert" className="card flex w-full max-w-md flex-col items-center gap-3 p-8 text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-full bg-rally/10 text-2xl text-rally" aria-hidden="true">✕</span>
+            <h2 className="font-display text-lg font-bold">{t.posterDetail.rejectedTitle}</h2>
+            <p className="text-ink/75">{t.posterDetail.rejectedMessage}</p>
+            {p.rejectionNote && <p className="text-sm text-ink/60"><span className="font-semibold">{t.posterDetail.rejectionNote}</span> {p.rejectionNote}</p>}
+          </div>
+        )}
         {p.status === 'failed' && (
           <div role="alert" className="card flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
             <span className="grid h-14 w-14 place-items-center rounded-full bg-rally/10 text-2xl text-rally" aria-hidden="true">!</span>

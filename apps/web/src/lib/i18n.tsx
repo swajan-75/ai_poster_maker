@@ -68,15 +68,17 @@ const dict = {
       photoAlt: (n: number) => `ছবি ${bnNum(n)}`, removeAlt: (n: number) => `ছবি ${bnNum(n)} সরান`,
     },
     regenerate: { title: 'লেখা পরিবর্তন করে আবার তৈরি করুন', remaining: (n: number) => `আর ${bnNum(n)} বার পুনরায় তৈরি করা যাবে। একই লেখায় আবার চাপলে নতুন ডিজাইন আসবে।`, submit: 'আবার তৈরি করুন' },
-    statusBadge: { queued: 'অপেক্ষমাণ', generating: 'তৈরি হচ্ছে', completed: 'সম্পন্ন', failed: 'ব্যর্থ' },
+    statusBadge: { pending_review: 'যাচাই চলছে', queued: 'অপেক্ষমাণ', generating: 'তৈরি হচ্ছে', completed: 'সম্পন্ন', failed: 'ব্যর্থ', rejected: 'প্রত্যাখ্যাত' },
     posterCard: { download: 'ডাউনলোড', delete: 'মুছুন', confirmDelete: 'পোস্টারটি মুছে ফেলবেন?' },
     posterDetail: {
       generatingMessage: 'পোস্টার তৈরি হচ্ছে… সাধারণত ২০–৪০ সেকেন্ড লাগে', downloadPng: 'PNG ডাউনলোড (প্রিন্ট)', downloadJpg: 'JPG ডাউনলোড',
       failedMessage: 'পোস্টার তৈরি করা যায়নি। আবার চেষ্টা করুন।', retry: 'আবার চেষ্টা করুন', createAnother: 'আরেকটি পোস্টার তৈরি করুন',
       allPosters: 'আমার সব পোস্টার', notFound: 'পোস্টারটি পাওয়া যায়নি।',
+      underReviewTitle: 'পোস্টারটি যাচাই করা হচ্ছে', underReviewMessage: 'লেখার কিছু অংশ আমাদের টিম যাচাই করছে। অনুমোদন পেলে পোস্টারটি স্বয়ংক্রিয়ভাবে তৈরি হবে।',
+      rejectedTitle: 'পোস্টারটি অনুমোদন পায়নি', rejectedMessage: 'লেখাটি আমাদের নীতিমালার সাথে সঙ্গতিপূর্ণ নয়, তাই পোস্টারটি তৈরি করা হবে না।', rejectionNote: 'কারণ:',
     },
     admin: {
-      pageTitle: 'অ্যাডমিন প্যানেল', analyticsTab: 'পরিসংখ্যান', templatesTab: 'টেমপ্লেট', postersTab: 'পোস্টার', usersTab: 'ব্যবহারকারী',
+      pageTitle: 'অ্যাডমিন প্যানেল', analyticsTab: 'পরিসংখ্যান', templatesTab: 'টেমপ্লেট', postersTab: 'পোস্টার', moderationTab: 'যাচাই', usersTab: 'ব্যবহারকারী',
       newTemplate: 'নতুন টেমপ্লেট', editTemplate: 'টেমপ্লেট সম্পাদনা', backToList: 'তালিকায় ফিরুন',
       active: 'সচল', inactive: 'নিষ্ক্রিয়', deactivate: 'নিষ্ক্রিয় করুন', confirmDeactivate: 'এই টেমপ্লেটটি নিষ্ক্রিয় করবেন?',
       slug: 'স্লাগ', title: 'শিরোনাম', occasion: 'উপলক্ষ', layoutKey: 'লেআউট', photoSlots: 'ছবির সংখ্যা',
@@ -89,6 +91,8 @@ const dict = {
       blocked: 'ব্লক করা', allUsers: 'সব ব্যবহারকারী', activeUsers: 'সচল', blockedUsers: 'ব্লক করা',
       block: 'ব্লক করুন', unblock: 'আনব্লক করুন', confirmBlock: 'এই ব্যবহারকারীকে ব্লক করবেন?', cannotBlockSelf: 'নিজেকে ব্লক করা যাবে না',
       empty: 'কিছু পাওয়া যায়নি।', prev: 'আগের', next: 'পরের',
+      queueEmpty: 'যাচাইয়ের জন্য কোনো পোস্টার নেই।', flagReason: 'চিহ্নিত করার কারণ', approve: 'অনুমোদন', reject: 'প্রত্যাখ্যান',
+      rejectNotePrompt: 'ব্যবহারকারীকে কারণ জানান (ঐচ্ছিক):', flaggedAt: 'চিহ্নিত',
     },
     plans: { free: 'ফ্রি', pro: 'প্রো', ultra: 'আল্ট্রা' },
     pricingPage: {
@@ -149,6 +153,7 @@ const dict = {
       PHOTO_NOT_OWNED: 'ছবিটি আবার আপলোড করুন।', TEMPLATE_UNAVAILABLE: 'এই টেমপ্লেটটি এখন পাওয়া যাচ্ছে না।',
       UPGRADE_REQUIRED: 'এই সুবিধার জন্য প্রো বা আল্ট্রা প্যাকেজ দরকার।', PLAN_DOWNGRADE: 'আপনার এখন এর চেয়ে বড় প্যাকেজ সচল আছে।',
       PAYMENT_FAILED: 'ভেরিফিকেশন কোড বা পিন সঠিক নয়।', PAYMENT_CLOSED: 'এই পেমেন্টটি আর খোলা নেই। আবার চেষ্টা করুন।', POSTER_NOT_READY: 'পোস্টারটি এখনো তৈরি হয়নি।',
+      POSTER_UNDER_REVIEW: 'পোস্টারটি এখন যাচাই করা হচ্ছে।', POSTER_REJECTED: 'এই পোস্টারটি অনুমোদন পায়নি।', POSTER_NOT_PENDING: 'এই পোস্টারের সিদ্ধান্ত আগেই নেওয়া হয়েছে।',
       SLUG_TAKEN: 'এই স্লাগ দিয়ে আগেই একটি টেমপ্লেট আছে।', FALLBACK: 'কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।',
     },
     validation: {
@@ -199,15 +204,17 @@ const dict = {
       photoAlt: (n: number) => `Photo ${n}`, removeAlt: (n: number) => `Remove photo ${n}`,
     },
     regenerate: { title: 'Edit the text and regenerate', remaining: (n: number) => `You can regenerate ${n} more time(s). Pressing again with the same text produces a new design.`, submit: 'Regenerate' },
-    statusBadge: { queued: 'Queued', generating: 'Generating', completed: 'Completed', failed: 'Failed' },
+    statusBadge: { pending_review: 'Under review', queued: 'Queued', generating: 'Generating', completed: 'Completed', failed: 'Failed', rejected: 'Rejected' },
     posterCard: { download: 'Download', delete: 'Delete', confirmDelete: 'Delete this poster?' },
     posterDetail: {
       generatingMessage: 'Generating your poster… usually takes 20–40 seconds', downloadPng: 'Download PNG (print)', downloadJpg: 'Download JPG',
       failedMessage: "Couldn't generate the poster. Please try again.", retry: 'Try again', createAnother: 'Create another poster',
       allPosters: 'All my posters', notFound: 'Poster not found.',
+      underReviewTitle: 'Your poster is being reviewed', underReviewMessage: 'Our team is checking some of the text. Once approved, the poster will be generated automatically.',
+      rejectedTitle: 'Your poster was not approved', rejectedMessage: "The text doesn't meet our content policy, so this poster won't be generated.", rejectionNote: 'Reason:',
     },
     admin: {
-      pageTitle: 'Admin panel', analyticsTab: 'Analytics', templatesTab: 'Templates', postersTab: 'Posters', usersTab: 'Users',
+      pageTitle: 'Admin panel', analyticsTab: 'Analytics', templatesTab: 'Templates', postersTab: 'Posters', moderationTab: 'Review', usersTab: 'Users',
       newTemplate: 'New template', editTemplate: 'Edit template', backToList: 'Back to list',
       active: 'Active', inactive: 'Inactive', deactivate: 'Deactivate', confirmDeactivate: 'Deactivate this template?',
       slug: 'Slug', title: 'Title', occasion: 'Occasion', layoutKey: 'Layout', photoSlots: 'Photo slots',
@@ -220,6 +227,8 @@ const dict = {
       blocked: 'Blocked', allUsers: 'All users', activeUsers: 'Active', blockedUsers: 'Blocked',
       block: 'Block', unblock: 'Unblock', confirmBlock: 'Block this user?', cannotBlockSelf: 'You cannot block yourself',
       empty: 'Nothing found.', prev: 'Previous', next: 'Next',
+      queueEmpty: 'No posters waiting for review.', flagReason: 'Why it was flagged', approve: 'Approve', reject: 'Reject',
+      rejectNotePrompt: 'Tell the user why (optional):', flaggedAt: 'Flagged',
     },
     plans: { free: 'Free', pro: 'Pro', ultra: 'Ultra' },
     pricingPage: {
@@ -280,6 +289,7 @@ const dict = {
       PHOTO_NOT_OWNED: 'Please upload the photo again.', TEMPLATE_UNAVAILABLE: 'This template is currently unavailable.',
       UPGRADE_REQUIRED: 'This needs a Pro or Ultra plan.', PLAN_DOWNGRADE: 'You already have a higher plan active.',
       PAYMENT_FAILED: 'The verification code or PIN is incorrect.', PAYMENT_CLOSED: 'This payment is no longer open. Please try again.', POSTER_NOT_READY: 'The poster is not ready yet.',
+      POSTER_UNDER_REVIEW: 'This poster is being reviewed.', POSTER_REJECTED: 'This poster was not approved.', POSTER_NOT_PENDING: 'This poster has already been reviewed.',
       SLUG_TAKEN: 'A template with this slug already exists.', FALLBACK: 'Something went wrong. Please try again.',
     },
     validation: {

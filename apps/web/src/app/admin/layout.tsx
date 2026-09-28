@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <nav className="flex flex-wrap gap-2">
         <Tab href="/admin/analytics">{t.admin.analyticsTab}</Tab>
         <Tab href="/admin/templates">{t.admin.templatesTab}</Tab>
+        <Tab href="/admin/moderation">{t.admin.moderationTab}</Tab>
         <Tab href="/admin/posters">{t.admin.postersTab}</Tab>
         <Tab href="/admin/users">{t.admin.usersTab}</Tab>
       </nav>

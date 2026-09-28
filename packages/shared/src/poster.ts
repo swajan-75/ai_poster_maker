@@ -63,6 +63,8 @@ export interface PosterDTO {
   regenerationsLeft: number;
   watermarked: boolean;
   error: string | null;
+  /** The admin's note when the poster was rejected in moderation. */
+  rejectionNote: string | null;
   createdAt: string;
 }
 
@@ -74,5 +76,17 @@ export interface AdminPosterDTO extends PosterDTO {
 }
 
 export interface AdminPosterListDTO { items: AdminPosterDTO[]; total: number; page: number; limit: number }
+
+/** A poster waiting in the moderation queue. It has no rendered image yet, so the admin reviews the text and photos. */
+export interface ModerationItemDTO extends AdminPosterDTO {
+  flagReason: string;
+  flaggedAt: string;
+  photoUrls: string[];
+}
+
+export interface ModerationListDTO { items: ModerationItemDTO[]; total: number; page: number; limit: number }
+
+export const rejectPosterSchema = z.object({ note: z.string().trim().max(300).regex(NO_CONTROL).optional() });
+export type RejectPosterInput = z.infer<typeof rejectPosterSchema>;
 
 export interface UploadedPhotoDTO { publicId: string; url: string; width: number; height: number }

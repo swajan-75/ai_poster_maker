@@ -7,6 +7,7 @@ import type { AppDeps } from '../src/runtime-types.js';
 import { MemoryStorage } from '../src/services/storage/memory-storage.js';
 import type { PosterQueue } from '../src/jobs/job-queue.js';
 import { FakeRenderer } from '../src/render/fake-renderer.js';
+import { FakeModerationProvider } from '../src/services/ai/fake-moderation-provider.js';
 
 export class FakeQueue implements PosterQueue {
   enqueued: string[] = [];
@@ -25,7 +26,7 @@ export function testEnv(overrides: Record<string, string> = {}): Env {
 }
 
 export function makeTestDeps(overrides: Partial<AppDeps> = {}): AppDeps {
-  return { env: testEnv(), logger: pino({ level: 'silent' }), storage: new MemoryStorage(), queue: new FakeQueue(), renderer: new FakeRenderer(), ...overrides };
+  return { env: testEnv(), logger: pino({ level: 'silent' }), storage: new MemoryStorage(), queue: new FakeQueue(), renderer: new FakeRenderer(), moderator: new FakeModerationProvider(), ...overrides };
 }
 
 let seq = 0;

@@ -5,7 +5,7 @@ import type { PosterDTO } from '@poster/shared';
 import { RegenerateForm } from '@/components/RegenerateForm';
 
 const poster: PosterDTO = {
-  id: 'p1', templateId: 't1', status: 'completed', imageUrl: 'x', downloadUrls: { png: 'a', jpg: 'b' }, regenerationsLeft: 2, watermarked: false, size: 'portrait', error: null, createdAt: new Date().toISOString(),
+  id: 'p1', templateId: 't1', status: 'completed', imageUrl: 'x', downloadUrls: { png: 'a', jpg: 'b' }, regenerationsLeft: 2, watermarked: false, size: 'portrait', error: null, rejectionNote: null, createdAt: new Date().toISOString(),
   formData: { name: 'করিম', designation: 'সভাপতি', organization: 'কমিটি', union: '', thana: '', district: 'ঢাকা', headline: 'বিজয় দিবস', tagline: '' },
 };
 

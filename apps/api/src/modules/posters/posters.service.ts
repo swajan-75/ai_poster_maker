@@ -5,7 +5,10 @@ import {
   SIZE_SPECS, type CreatePosterInput, type PdfPaper, type Plan, type PosterFormData, type RegenerateInput, type UserRole,
 } from '@poster/shared';
 import { AppError, badRequest, conflict, notFound, tooMany, unprocessable } from '../../lib/errors.js';
+import type { Logger } from '../../lib/logger.js';
 import { findBlockedTerm } from '../../lib/moderation.js';
+import { withTimeout } from '../../lib/timeout.js';
+import type { ModerationProvider } from '../../services/ai/moderation-provider.js';
 import { PosterModel, type PosterDoc } from '../../models/poster.model.js';
 import type { PosterQueue } from '../../jobs/job-queue.js';
 import type { StorageService } from '../../services/storage/storage.js';
@@ -30,13 +33,34 @@ function assertTemplateAllowed(template: { isFree: boolean }, plan: Plan): void 
     throw upgradeRequired('premium_template', 'This template needs a Pro or Ultra plan');
 }
 
-function assertClean(form: Partial<PosterFormData>): void {
-  for (const v of Object.values(form)) {
-    if (typeof v === 'string' && findBlockedTerm(v)) throw unprocessable('CONTENT_BLOCKED', 'Text contains prohibited content');
+const MODERATION_TIMEOUT_MS = 15_000;
+
+export interface ModerationDeps { moderator: ModerationProvider; logger: Logger }
+
+/**
+ * Decides whether poster text can go straight to generation. Returns the reason to hold it for
+ * human review, or null when it is clean. Fails closed: if the AI check errors, a human decides.
+ */
+async function screenText(form: Partial<PosterFormData>, deps: ModerationDeps): Promise<string | null> {
+  const texts = Object.fromEntries(Object.entries(form).filter((e): e is [string, string] => typeof e[1] === 'string' && e[1].trim() !== ''));
+  for (const v of Object.values(texts)) {
+    const term = findBlockedTerm(v);
+    if (term) return `Blocked term: "${term}"`;
+  }
+  try {
+    const verdict = await withTimeout(deps.moderator.review(texts), MODERATION_TIMEOUT_MS, 'moderation');
+    return verdict.flagged ? (verdict.reason ?? 'Flagged by AI review') : null;
+  } catch (err) {
+    deps.logger.warn({ err }, 'moderation check failed; holding poster for review');
+    return 'Automatic check unavailable';
   }
 }
 
-export async function createPoster(user: AuthUser, input: CreatePosterInput, deps: { queue: PosterQueue }): Promise<PosterDoc> {
+const flagged = (reason: string) => ({ flagReason: reason, flaggedAt: new Date() });
+
+export async function createPoster(
+  user: AuthUser, input: CreatePosterInput, deps: { queue: PosterQueue } & ModerationDeps,
+): Promise<PosterDoc> {
   const template = await getActiveTemplate(input.templateId).catch(() => {
     throw unprocessable('TEMPLATE_UNAVAILABLE', 'Template is not available');
   });
@@ -48,20 +72,22 @@ export async function createPoster(user: AuthUser, input: CreatePosterInput, dep
     throw new AppError(403, 'PHOTO_NOT_OWNED', 'One or more photos do not belong to you');
 
   const formData = normalizeForm(input.formData);
-  assertClean(formData);
 
+  // A flagged poster still takes a quota slot: it counts the moment it is submitted, whatever the verdict.
   const usageId = await reservePosterSlot(user.id, template.id, plan);
   let poster: PosterDoc;
   try {
+    const flagReason = await screenText(formData, deps);
     poster = await PosterModel.create({
       userId: user.id, templateId: template._id, formData, photoIds: input.photoIds, size: input.size, watermarked: PLAN_FEATURES[plan].watermark,
+      ...(flagReason ? { status: 'pending_review', moderation: flagged(flagReason) } : {}),
     });
   } catch (err) {
     await PosterUsageModel.deleteOne({ _id: usageId });
     throw err;
   }
   await PosterUsageModel.updateOne({ _id: usageId }, { posterId: poster._id });
-  deps.queue.enqueue(poster.id);
+  if (poster.status === 'queued') deps.queue.enqueue(poster.id);
   return poster;
 }
 
@@ -80,10 +106,18 @@ export async function listPosters(ownerId: string, page: number, limit: number) 
   return { items, total };
 }
 
-export async function regeneratePoster(id: string, user: AuthUser, input: RegenerateInput, deps: { queue: PosterQueue }): Promise<PosterDoc> {
+function assertNotModerated(p: { status: string }): void {
+  if (p.status === 'pending_review') throw conflict('POSTER_UNDER_REVIEW', 'Poster is waiting for review');
+  if (p.status === 'rejected') throw conflict('POSTER_REJECTED', 'Poster was rejected in review');
+}
+
+export async function regeneratePoster(
+  id: string, user: AuthUser, input: RegenerateInput, deps: { queue: PosterQueue } & ModerationDeps,
+): Promise<PosterDoc> {
   if (!isValidObjectId(id)) throw notFound('Poster not found');
-  const existing = await PosterModel.findOne({ _id: id, userId: user.id }, { templateId: 1 });
+  const existing = await PosterModel.findOne({ _id: id, userId: user.id }, { templateId: 1, formData: 1, status: 1 });
   if (!existing) throw notFound('Poster not found');
+  assertNotModerated(existing);
   const plan = await getUserPlan(user.id);
   const template = await TemplateModel.findById(existing.templateId, { isFree: 1 });
   if (template) assertTemplateAllowed(template, plan);
@@ -91,8 +125,10 @@ export async function regeneratePoster(id: string, user: AuthUser, input: Regene
   const $set: Record<string, unknown> = { status: 'queued', watermarked: PLAN_FEATURES[plan].watermark, reuseDesign: false };
   if (input.formData) {
     const patch = normalizeForm(input.formData);
-    assertClean(patch);
     for (const [k, v] of Object.entries(patch)) if (v !== undefined) $set[`formData.${k}`] = v;
+    // Screen the whole resulting text, so the AI sees each edit in context.
+    const flagReason = await screenText({ ...(existing.toObject().formData as PosterFormData), ...patch }, deps);
+    if (flagReason) Object.assign($set, { status: 'pending_review', moderation: flagged(flagReason) });
   }
   const base = { _id: id, userId: user.id };
   // Retry after failure: free. Regenerate a completed poster: costs one.
@@ -106,10 +142,11 @@ export async function regeneratePoster(id: string, user: AuthUser, input: Regene
   if (!updated) {
     const p = await PosterModel.findOne(base);
     if (!p) throw notFound('Poster not found');
+    assertNotModerated(p);
     if (p.status === 'queued' || p.status === 'generating') throw conflict('POSTER_BUSY', 'Poster is already being generated');
     throw tooMany('REGEN_LIMIT_REACHED', 'Regeneration limit reached');
   }
-  deps.queue.enqueue(updated.id);
+  if (updated.status === 'queued') deps.queue.enqueue(updated.id);
   return updated;
 }
 

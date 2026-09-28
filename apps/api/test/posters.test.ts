@@ -11,6 +11,7 @@ import { PosterModel } from '../src/models/poster.model.js';
 import { UserModel } from '../src/models/user.model.js';
 import { PosterUsageModel } from '../src/models/poster-usage.model.js';
 import { MemoryStorage } from '../src/services/storage/memory-storage.js';
+import { FakeModerationProvider } from '../src/services/ai/fake-moderation-provider.js';
 
 useTestDb();
 
@@ -87,11 +88,14 @@ describe('POST /api/posters', () => {
     expect(res.body.error.code).toBe('TEMPLATE_UNAVAILABLE');
   });
 
-  it('blocked content → 422 CONTENT_BLOCKED', async () => {
-    const { agent } = await registerAgent(app);
+  it('blocklisted text → held for review, not enqueued, still uses a quota slot', async () => {
+    const { agent, user } = await registerAgent(app);
     const res = await create(agent, { formData: { ...sampleForm, headline: 'ওদের হত্যা করো' } });
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('CONTENT_BLOCKED');
+    expect(res.status).toBe(202);
+    expect(res.body.status).toBe('pending_review');
+    expect(queue.enqueued).toEqual([]);
+    expect((await PosterModel.findById(res.body.id))!.moderation!.flagReason).toMatch(/হত্যা করো/);
+    expect(await PosterUsageModel.countDocuments({ userId: user.id })).toBe(1);
   });
 
   it('enforces the daily quota → 429 DAILY_LIMIT', async () => {
@@ -223,10 +227,65 @@ describe('POST /api/posters/:id/regenerate', () => {
     expect(res.body.error).toBeNull();
   });
 
-  it('blocked text in regenerate → 422', async () => {
+  it('blocked text in regenerate → held for review, not enqueued', async () => {
     const { agent } = await registerAgent(app);
     const id = await completed(agent);
-    await agent.post(`/api/posters/${id}/regenerate`).send({ formData: { headline: 'kill them all' } }).expect(422);
+    queue.enqueued = [];
+    const res = await agent.post(`/api/posters/${id}/regenerate`).send({ formData: { headline: 'kill them all' } }).expect(202);
+    expect(res.body.status).toBe('pending_review');
+    expect(queue.enqueued).toEqual([]);
+  });
+
+  it('cannot regenerate a poster under review or rejected', async () => {
+    const { agent } = await registerAgent(app);
+    const id = (await create(agent)).body.id as string;
+    await PosterModel.updateOne({ _id: id }, { status: 'pending_review', moderation: { flagReason: 'x', flaggedAt: new Date() } });
+    let res = await agent.post(`/api/posters/${id}/regenerate`).send({}).expect(409);
+    expect(res.body.error.code).toBe('POSTER_UNDER_REVIEW');
+    await PosterModel.updateOne({ _id: id }, { status: 'rejected' });
+    res = await agent.post(`/api/posters/${id}/regenerate`).send({}).expect(409);
+    expect(res.body.error.code).toBe('POSTER_REJECTED');
+  });
+});
+
+describe('AI moderation on create', () => {
+  const appWith = (behavior: 'flag' | 'fail') => {
+    const moderator = new FakeModerationProvider(behavior);
+    return { moderator, app: createApp(makeTestDeps({ queue, storage, renderer, moderator, env: testEnv({ GENERATION_RATE_LIMIT: '100' }) })) };
+  };
+
+  it('clean text is checked by the AI and goes straight to generation', async () => {
+    const moderator = new FakeModerationProvider('clean');
+    const a = createApp(makeTestDeps({ queue, storage, renderer, moderator }));
+    const { agent } = await registerAgent(a);
+    const res = await create(agent);
+    expect(res.body.status).toBe('queued');
+    expect(moderator.calls[0]).toMatchObject({ headline: sampleForm.headline });
+  });
+
+  it('AI-flagged text → pending_review with the AI reason', async () => {
+    const { app: a } = appWith('flag');
+    const { agent } = await registerAgent(a);
+    const res = await create(agent);
+    expect(res.status).toBe(202);
+    expect(res.body.status).toBe('pending_review');
+    expect(queue.enqueued).toEqual([]);
+    expect((await PosterModel.findById(res.body.id))!.moderation!.flagReason).toBe('fake: flagged for review');
+  });
+
+  it('AI check failure fails closed → pending_review', async () => {
+    const { app: a } = appWith('fail');
+    const { agent } = await registerAgent(a);
+    const res = await create(agent);
+    expect(res.body.status).toBe('pending_review');
+    expect((await PosterModel.findById(res.body.id))!.moderation!.flagReason).toBe('Automatic check unavailable');
+  });
+
+  it('flagged posters count toward the daily limit', async () => {
+    const { app: a } = appWith('flag');
+    const { agent } = await registerAgent(a);
+    for (let i = 0; i < 3; i++) expect((await create(agent)).status).toBe(202);
+    expect((await create(agent)).body.error.code).toBe('DAILY_LIMIT');
   });
 });
 

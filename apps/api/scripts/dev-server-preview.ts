@@ -11,6 +11,7 @@ import { createApp } from '../src/http/app.js';
 import { connectDb } from '../src/db/connect.js';
 import { MemoryStorage } from '../src/services/storage/memory-storage.js';
 import { FakeRenderer } from '../src/render/fake-renderer.js';
+import { FakeModerationProvider } from '../src/services/ai/fake-moderation-provider.js';
 
 const env = loadEnv();
 const logger = pino({ level: env.LOG_LEVEL });
@@ -18,7 +19,7 @@ const logger = pino({ level: env.LOG_LEVEL });
 await connectDb(env.MONGODB_URI);
 logger.info({ uri: env.MONGODB_URI }, 'connected to MongoDB');
 
-const app = createApp({ env, logger, storage: new MemoryStorage(), queue: { enqueue: () => undefined }, renderer: new FakeRenderer() });
+const app = createApp({ env, logger, storage: new MemoryStorage(), queue: { enqueue: () => undefined }, renderer: new FakeRenderer(), moderator: new FakeModerationProvider() });
 app.listen(env.PORT, () => {
   logger.info(`API listening on http://localhost:${env.PORT}`);
   logger.info(`Swagger UI:     http://localhost:${env.PORT}/api/docs`);
